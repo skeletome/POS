@@ -1,0 +1,400 @@
+"use client";
+
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { queryKeys } from "@/lib/api/keys";
+import type { Product, ProductInput } from "@/lib/schemas";
+import type { Bank, Category, Cashier, Transaction, TaxSettings, PaymentSettings } from "@/lib/types";
+import type { TransactionCreateInput } from "@/lib/schemas";
+
+interface ApiError {
+  error?: { message?: string; code?: string };
+}
+
+async function handleError(res: Response): Promise<never> {
+  let message = "Terjadi kesalahan.";
+  let body: ApiError | null = null;
+  try {
+    body = (await res.json()) as ApiError;
+  } catch {
+    // ignore
+  }
+  message = body?.error?.message ?? message;
+  const err = new Error(message) as Error & { code?: string };
+  err.code = body?.error?.code;
+  throw err;
+}
+
+export function useMe() {
+  return useQuery({
+    queryKey: queryKeys.me,
+    queryFn: async () => {
+      const res = await fetch("/api/me");
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as {
+        data: {
+          profile: { id: string; name: string; email: string };
+          membership: { role: "OWNER" | "CASHIER" };
+          store: { id: string; name: string };
+        };
+      };
+      return data;
+    },
+    staleTime: Infinity,
+  });
+}
+
+export function useProducts() {
+  return useQuery({
+    queryKey: queryKeys.products,
+    queryFn: async () => {
+      const res = await fetch("/api/products");
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: { products: Product[] } };
+      return data.products;
+    },
+  });
+}
+
+export function useCategories() {
+  return useQuery({
+    queryKey: queryKeys.categories,
+    queryFn: async () => {
+      const res = await fetch("/api/categories");
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: { categories: Category[] } };
+      return data.categories;
+    },
+  });
+}
+
+const invalidateProducts = (queryClient: ReturnType<typeof useQueryClient>) => {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.products });
+};
+
+export function useCreateProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ProductInput) => {
+      const res = await fetch("/api/products", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => invalidateProducts(queryClient),
+  });
+}
+
+export function useUpdateProduct(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ProductInput) => {
+      const res = await fetch(`/api/products/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => invalidateProducts(queryClient),
+  });
+}
+
+export function useDeleteProduct() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/products/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => invalidateProducts(queryClient),
+  });
+}
+
+export function useCreateCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string }) => {
+      const res = await fetch("/api/categories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.categories }),
+  });
+}
+
+export function useUpdateCategory(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string; active: boolean }) => {
+      const res = await fetch(`/api/categories/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.categories }),
+  });
+}
+
+export function useDeleteCategory() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/categories/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.categories }),
+  });
+}
+
+export function useBanks() {
+  return useQuery({
+    queryKey: queryKeys.banks,
+    queryFn: async () => {
+      const res = await fetch("/api/banks");
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: { banks: Bank[] } };
+      return data.banks;
+    },
+  });
+}
+
+export function useUpdateStore() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      payload: {
+        storeSettings?: { storeName: string; information: string };
+        taxSettings?: TaxSettings;
+        paymentSettings?: PaymentSettings;
+        qrisSettings?: { qrisName?: string; qrisEnabled?: boolean; qrisImageUrl?: string | null };
+      },
+    ) => {
+      const res = await fetch("/api/store", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.settings });
+    },
+  });
+}
+
+export function useUploadImage() {
+  return useMutation({
+    mutationFn: async ({ bucket, file }: { bucket: string; file: Blob }) => {
+      const body = new FormData();
+      body.append("bucket", bucket);
+      body.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body });
+      if (!res.ok) return handleError(res);
+      const json = (await res.json()) as { data: { url: string } };
+      return json.data.url;
+    },
+  });
+}
+
+export function useCreateBank() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string }) => {
+      const res = await fetch("/api/banks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.banks }),
+  });
+}
+
+export function useUpdateBank() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; name?: string; active?: boolean; logo?: string | null }) => {
+      const { id, ...payload } = input;
+      const res = await fetch(`/api/banks/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.banks }),
+  });
+}
+
+export function useSettings() {
+  return useQuery({
+    queryKey: queryKeys.settings,
+    queryFn: async () => {
+      const res = await fetch("/api/store");
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as {
+        data: {
+          storeSettings: { storeName: string; information: string };
+          taxSettings: TaxSettings;
+          paymentSettings: PaymentSettings;
+          qrisSettings: { qrisName: string; qrisImageUrl: string | null; qrisEnabled: boolean };
+        };
+      };
+      return data;
+    },
+  });
+}
+
+export function useCashiers(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.cashiers,
+    queryFn: async () => {
+      const res = await fetch("/api/cashiers");
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: { cashiers: Cashier[] } };
+      return data.cashiers;
+    },
+    enabled,
+  });
+}
+
+export function useCreateCashier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { name: string; email: string; password: string }) => {
+      const res = await fetch("/api/cashiers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.cashiers }),
+  });
+}
+
+export function useUpdateCashier() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: { id: string; active: boolean }) => {
+      const { id, ...payload } = input;
+      const res = await fetch(`/api/cashiers/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.cashiers }),
+  });
+}
+
+export function useTransactions(from?: string, to?: string) {
+  return useQuery({
+    queryKey: queryKeys.transactions.range(from, to),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from);
+      if (to) params.set("to", to);
+      const res = await fetch(`/api/transactions?${params.toString()}`);
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: { transactions: Transaction[] } };
+      return data.transactions;
+    },
+  });
+}
+
+export function useTransaction(id: string) {
+  return useQuery({
+    queryKey: queryKeys.transactions.detail(id),
+    queryFn: async () => {
+      const res = await fetch(`/api/transactions/${encodeURIComponent(id)}`);
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: { transaction: Transaction } };
+      return data.transaction;
+    },
+  });
+}
+
+export function useCreateTransaction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: TransactionCreateInput) => {
+      const res = await fetch("/api/transactions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return (await res.json()) as { data: { transactionNo: string; total: number } };
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.reports() });
+    },
+  });
+}
+
+export function useUpdateTransactionStatus(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (status: "PENDING" | "COMPLETED" | "CANCELLED") => {
+      const res = await fetch(`/api/transactions/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.detail(id) });
+    },
+  });
+}
+
+export interface ReportsData {
+  totals: {
+    totalSales: number;
+    totalTransactions: number;
+    totalItemsSold: number;
+    averageTransactionValue: number;
+  };
+  topProducts: { name: string; quantity: number; revenue: number }[];
+  paymentBreakdown: { method: string; total: number }[];
+}
+
+export function useReports(from?: Date, to?: Date) {
+  return useQuery({
+    queryKey: queryKeys.reports(from?.toISOString(), to?.toISOString()),
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (from) params.set("from", from.toISOString());
+      if (to) params.set("to", to.toISOString());
+      const res = await fetch(`/api/reports?${params.toString()}`);
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: ReportsData };
+      return data;
+    },
+  });
+}

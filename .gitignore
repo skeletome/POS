@@ -39,3 +39,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local tooling / logs / agent state
+.opencode/
+.agents/
+.agents-log/
+
+# supabase CLI local state
+supabase/.temp/
