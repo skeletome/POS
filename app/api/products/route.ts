@@ -10,23 +10,75 @@
  */
 import { NextResponse } from "next/server";
 import { requireStoreContext, isOwner } from "@/lib/api/session";
-import { listProducts, insertProductWithOptions, storesToSettings } from "@/lib/api/products";
+import {
+  insertProductWithOptions,
+  listProducts,
+  listProductsPage,
+  storesToSettings,
+} from "@/lib/api/products";
 import { productSchema } from "@/lib/schemas";
 import { createClient } from "@/lib/supabase/server";
 import { jsonError, parseJsonBody, isAllowedImageUrl } from "@/lib/api/utilities";
 
-export async function GET() {
+const PRODUCT_SORT_KEYS = new Set(["name", "dineInPrice", "takeawayPrice", "createdAt"]);
+
+export async function GET(request: Request) {
   const auth = await requireStoreContext();
   if (!auth.ok) return auth.response;
 
+  const url = new URL(request.url);
+  const pageParam = url.searchParams.get("page");
+  const pageSizeParam = url.searchParams.get("pageSize") ?? url.searchParams.get("limit");
+
+  // Tanpa param pagination -> full-list (backward-compat untuk DataLoader/POS/login).
+  if (pageParam === null || pageSizeParam === null) {
+    try {
+      const supabase = await createClient();
+      const { products } = await listProducts(supabase, auth.ctx.store.id);
+
+      return NextResponse.json({
+        data: {
+          products,
+          ...storesToSettings(auth.ctx.store),
+        },
+      });
+    } catch {
+      return jsonError("Gagal memuat produk.", 500);
+    }
+  }
+
+  const page = Number.parseInt(pageParam, 10);
+  const rawPageSize = Number.parseInt(pageSizeParam, 10);
+  if (!Number.isInteger(page) || page < 1) {
+    return jsonError("Parameter halaman tidak valid.", 400);
+  }
+  const pageSize =
+    Number.isInteger(rawPageSize) && rawPageSize > 0 ? Math.min(rawPageSize, 100) : 50;
+
+  const rawSortBy = url.searchParams.get("sortBy");
+  const sortBy = rawSortBy && PRODUCT_SORT_KEYS.has(rawSortBy)
+    ? (rawSortBy as "name" | "dineInPrice" | "takeawayPrice" | "createdAt")
+    : "name";
+  const rawSortDir = url.searchParams.get("sortDir");
+  const sortDir = rawSortDir === "desc" ? "desc" : rawSortDir === "asc" ? "asc" : "asc";
+
   try {
     const supabase = await createClient();
-    const { products } = await listProducts(supabase, auth.ctx.store.id);
+    const { products, total } = await listProductsPage(supabase, auth.ctx.store.id, {
+      page,
+      pageSize,
+      search: url.searchParams.get("search")?.trim() || undefined,
+      categoryId: url.searchParams.get("categoryId")?.trim() || undefined,
+      sortBy,
+      sortDir,
+    });
 
     return NextResponse.json({
       data: {
         products,
-        ...storesToSettings(auth.ctx.store),
+        total,
+        page,
+        pageSize,
       },
     });
   } catch {

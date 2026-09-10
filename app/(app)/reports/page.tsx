@@ -2,10 +2,10 @@
 
 import { BarChart3, Download, Package, ReceiptText, Wallet } from "lucide-react";
 import { useMemo, useState } from "react";
-import { Badge, Button, Card, CardHeader, EmptyState, Tabs } from "@/components/ui";
+import { Badge, Button, Card, CardHeader, Tabs } from "@/components/ui";
 import { ReportsSkeleton } from "@/components/skeletons";
+import { DataTable } from "@/components/data-table";
 import { DateRangePickerInline } from "@/components/date-range-picker";
-import { cn } from "@/lib/cn";
 import { dateRangePresets, getRange, isWithin, type DateRangeKey } from "@/lib/date-range";
 import { formatDate, formatRupiah } from "@/lib/format";
 import { paymentMethodLabels } from "@/lib/dummy-data";
@@ -13,6 +13,7 @@ import { usePosStore } from "@/lib/use-pos-store";
 import { useReports } from "@/lib/api/hooks";
 import { exportReportExcel } from "@/lib/report-export";
 import type { PaymentMethod } from "@/lib/types";
+import type { ColumnDef } from "@tanstack/react-table";
 
 type ReportTab = "sales" | "products" | "payments";
 
@@ -94,18 +95,48 @@ export default function ReportsPage() {
     return base;
   }, [filtered]);
 
-  const [productSort, setProductSort] = useState<"qty" | "revenue">("qty");
-  const sortedProducts = useMemo(() => {
-    return [...productReport].sort((a, b) =>
-      productSort === "qty" ? b.qty - a.qty : b.revenue - a.revenue,
-    );
-  }, [productReport, productSort]);
-
   const handleExport = () => {
     const prefix = `${formatDate(range.from.toISOString())}_${formatDate(range.to.toISOString())}`;
     const tabLabel = tab === "sales" ? "sales" : tab === "products" ? "produk" : "pembayaran";
-    exportReportExcel(tab, filtered, sortedProducts, paymentReport, `laporan-${tabLabel}-${prefix}`);
+    exportReportExcel(tab, filtered, productReport, paymentReport, `laporan-${tabLabel}-${prefix}`);
   };
+
+  const productColumns: ColumnDef<{ name: string; qty: number; revenue: number }, unknown>[] = [
+    {
+      id: "name",
+      accessorKey: "name",
+      header: "Produk",
+      cell: ({ row }) => {
+        const product = products.find((x) => x.name === row.original.name);
+        return (
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-50 text-sm">
+              {product?.emoji ?? "🍽️"}
+            </span>
+            <span className="font-medium text-text-primary">{row.original.name}</span>
+          </div>
+        );
+      },
+    },
+    {
+      id: "qty",
+      accessorKey: "qty",
+      header: () => <div className="text-right">Quantity Terjual</div>,
+      cell: ({ row }) => (
+        <div className="text-right text-text-secondary">{row.original.qty}</div>
+      ),
+    },
+    {
+      id: "revenue",
+      accessorKey: "revenue",
+      header: () => <div className="text-right">Revenue</div>,
+      cell: ({ row }) => (
+        <div className="text-right font-semibold text-text-primary">
+          {formatRupiah(row.original.revenue)}
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-5">
@@ -180,63 +211,16 @@ export default function ReportsPage() {
           <CardHeader
             title="Laporan Produk"
             description="Jumlah terjual dan pendapatan per produk dari transaksi completed."
-            action={
-              <div className="flex items-center gap-1 rounded-lg bg-slate-50 p-1">
-                {(["qty", "revenue"] as const).map((k) => (
-                  <button
-                    key={k}
-                    onClick={() => setProductSort(k)}
-                    className={cn(
-                      "cursor-pointer rounded-md px-3 py-1 text-xs font-medium transition-colors",
-                      productSort === k ? "bg-primary-500 text-white" : "text-text-primary",
-                    )}
-                  >
-                    {k === "qty" ? "Qty" : "Revenue"}
-                  </button>
-                ))}
-              </div>
-            }
           />
-          {sortedProducts.length === 0 ? (
-            <EmptyState
-              icon={<Package size={20} />}
-              title="Belum ada data"
-              description="Belum ada penjualan pada periode ini."
-            />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-border text-xs text-text-muted">
-                    <th className="pb-2 pr-4 font-medium">Produk</th>
-                    <th className="pb-2 pr-4 text-right font-medium">Quantity Terjual</th>
-                    <th className="pb-2 text-right font-medium">Revenue</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sortedProducts.map((p) => {
-                    const product = products.find((x) => x.name === p.name);
-                    return (
-                      <tr key={p.name} className="border-b border-border-light last:border-0">
-                        <td className="py-3 pr-4">
-                          <div className="flex items-center gap-3">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-50 text-sm">
-                              {product?.emoji ?? "🍽️"}
-                            </span>
-                            <span className="font-medium text-text-primary">{p.name}</span>
-                          </div>
-                        </td>
-                        <td className="py-3 pr-4 text-right text-text-secondary">{p.qty}</td>
-                        <td className="py-3 text-right font-semibold text-text-primary">
-                          {formatRupiah(p.revenue)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable
+            columns={productColumns}
+            data={productReport}
+            initialSorting={[{ id: "qty", desc: true }]}
+            searchPlaceholder="Cari produk…"
+            emptyTitle="Belum ada data"
+            emptyDescription="Belum ada penjualan pada periode ini."
+            emptyIcon={<Package size={20} />}
+          />
         </Card>
       ) : null}
 

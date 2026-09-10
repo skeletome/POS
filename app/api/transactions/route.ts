@@ -15,10 +15,11 @@ import { requireStoreContext } from "@/lib/api/session";
 import { transactionCreateSchema } from "@/lib/schemas";
 import type { Transaction, TransactionItem, PaymentInfo } from "@/lib/types/order";
 import { createClient } from "@/lib/supabase/server";
-import { jsonError, parseJsonBody, getLimitParam, getDateRangeParam } from "@/lib/api/utilities";
+import { jsonError, parseJsonBody, getDateRangeParam } from "@/lib/api/utilities";
 import { writeLimiter, rateLimit } from "@/lib/rate-limit";
 
-const PAGE_SIZE = 50;
+const DEFAULT_PAGE_SIZE = 50;
+const MAX_PAGE_SIZE = 100;
 
 export async function GET(request: Request) {
   const auth = await requireStoreContext();
@@ -27,25 +28,64 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const { from, to } = getDateRangeParam(url);
-    const limit = getLimitParam(url, PAGE_SIZE, 200);
+
+    const pageParam = Number(url.searchParams.get("page") ?? "1");
+    const page = Number.isFinite(pageParam) && pageParam > 0 ? Math.floor(pageParam) : 1;
+
+    // dukung param `limit` lama sebagai ukuran halaman (backward-compat)
+    const pageSizeParam = url.searchParams.get("pageSize") ?? url.searchParams.get("limit");
+    const pageSizeRaw = Number(pageSizeParam ?? String(DEFAULT_PAGE_SIZE));
+    const pageSize = Number.isFinite(pageSizeRaw) && pageSizeRaw > 0
+      ? Math.min(Math.floor(pageSizeRaw), MAX_PAGE_SIZE)
+      : DEFAULT_PAGE_SIZE;
+
+    const search = url.searchParams.get("search")?.trim() ?? "";
+    const status = url.searchParams.get("status")?.trim() ?? "";
+    const payment = url.searchParams.get("payment")?.trim() ?? "";
+    const orderType = url.searchParams.get("orderType")?.trim() ?? "";
+    const cashier = url.searchParams.get("cashier")?.trim() ?? "";
+    const sortBy = url.searchParams.get("sortBy") === "total" ? "total" : "created_at";
+    const sortDir = url.searchParams.get("sortDir") === "asc" ? "asc" : "desc";
 
     const supabase = await createClient();
 
-    let query = supabase
-      .from("transactions")
-      .select("*")
-      .eq("store_id", auth.ctx.store.id)
-      .order("created_at", { ascending: false })
-      .limit(limit);
+    type TransactionsQuery = ReturnType<ReturnType<typeof supabase.from>["select"]>;
 
-    if (from) query = query.gte("created_at", from);
-    if (to) query = query.lte("created_at", to);
+    const withFilters = (q: TransactionsQuery): TransactionsQuery => {
+      let query = q;
+      if (from) query = query.gte("created_at", from);
+      if (to) query = query.lte("created_at", to);
+      if (search) query = query.ilike("transaction_no", `%${search}%`);
+      if (status) query = query.eq("status", status);
+      if (payment) query = query.eq("payment_method", payment);
+      if (orderType) query = query.eq("order_type", orderType);
+      if (cashier) query = query.eq("cashier_name", cashier);
+      return query;
+    };
 
-    const { data: rows, error } = await query;
+    // total untuk pagination (head: hanya count, tanpa body)
+    const countQuery = withFilters(
+      supabase.from("transactions").select("id", { count: "exact", head: true }),
+    ).eq("store_id", auth.ctx.store.id);
+    const { count: total, error: countError } = await countQuery;
+    if (countError) return jsonError("Gagal memuat transaksi.", 500);
+
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize - 1;
+
+    // ambil data halaman: filter + urutkan -> range
+    const { data: rows, error } = await withFilters(
+      supabase
+        .from("transactions")
+        .select("*")
+        .eq("store_id", auth.ctx.store.id)
+        .order(sortBy, { ascending: sortDir === "asc" })
+        .order("created_at", { ascending: false }),
+    ).range(start, end);
     if (error) return jsonError("Gagal memuat transaksi.", 500);
 
     // Ambil item untuk seluruh transaksi sekaligus (efisien, 1 query).
-    const txnIds = (rows ?? []).map((t) => t.id);
+    const txnIds = ((rows ?? []) as TrxRow[]).map((t) => t.id);
     const { data: itemRows } = txnIds.length
       ? await supabase.from("transaction_items").select("*").in("transaction_id", txnIds)
       : { data: [] };
@@ -61,11 +101,13 @@ export async function GET(request: Request) {
       itemsByTxn.set(it.transaction_id, list);
     }
 
-    const transactions: Transaction[] = (rows ?? []).map((t) =>
-      toFrontendTransaction(t, itemsByTxn.get(t.id) ?? []),
+    const transactions: Transaction[] = ((rows ?? []) as TrxRow[]).map((t) =>
+      toFrontendTransaction(t, (itemsByTxn.get(t.id) ?? []) as ItemRow[]),
     );
 
-    return NextResponse.json({ data: { transactions } });
+    return NextResponse.json({
+      data: { transactions, total: total ?? 0, page, pageSize },
+    });
   } catch {
     return jsonError("Gagal memuat transaksi.", 500);
   }

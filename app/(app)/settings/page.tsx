@@ -2,7 +2,6 @@
 
 import {
   Banknote,
-  Building2,
   CreditCard,
   Percent,
   Plus,
@@ -28,6 +27,7 @@ import {
   Textarea,
 } from "@/components/ui";
 import { SettingsSkeleton } from "@/components/skeletons";
+import { DataTable } from "@/components/data-table";
 import { cn } from "@/lib/cn";
 import { usePosStore } from "@/lib/use-pos-store";
 import { useUpdateStore, useUploadImage, useCreateBank, useUpdateBank, useSettings } from "@/lib/api/hooks";
@@ -35,6 +35,8 @@ import { storeSettingsSchema, type StoreSettings } from "@/lib/schemas/store";
 import { taxSettingsSchema, type TaxSettings } from "@/lib/schemas/tax";
 import { paymentSettingsSchema, type PaymentSettings } from "@/lib/schemas/payment";
 import { bankCreateSchema, type BankInput } from "@/lib/schemas/bank";
+import type { Bank } from "@/lib/types";
+import type { ColumnDef } from "@tanstack/react-table";
 
 type SettingsTab = "store" | "tax" | "payment" | "bank" | "qris";
 
@@ -353,6 +355,55 @@ function BankSettingsForm() {
     defaultValues: { name: "" },
   });
 
+  const columns: ColumnDef<Bank, unknown>[] = [
+    {
+      id: "name",
+      accessorKey: "name",
+      header: "Bank",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <BankLogo bank={row.original} />
+          <div>
+            <p className="text-sm font-medium text-text-primary">{row.original.name}</p>
+            <Badge
+              className={
+                row.original.active
+                  ? "bg-success-soft text-success-strong"
+                  : "bg-slate-100 text-text-muted"
+              }
+            >
+              {row.original.active ? "Aktif" : "Nonaktif"}
+            </Badge>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <div className="flex items-center justify-end gap-2">
+          <BankLogoActions
+            bank={row.original}
+            onLogo={async (logo) => {
+              setError(null);
+              try {
+                const url = await upload.mutateAsync({ bucket: "bank-logos", file: await dataUrlToBlob(logo) });
+                await updateBank.mutateAsync({ id: row.original.id, logo: url });
+              } catch (e) {
+                setError(e instanceof Error ? e.message : "Gagal mengunggah logo.");
+              }
+            }}
+            onRemoveLogo={() => updateBank.mutate({ id: row.original.id, logo: null })}
+            onToggle={() => updateBank.mutate({ id: row.original.id, active: !row.original.active })}
+          />
+        </div>
+      ),
+    },
+  ];
+
   const onSubmit = async (data: BankInput) => {
     setError(null);
     try {
@@ -415,51 +466,13 @@ function BankSettingsForm() {
         </div>
       </form>
 
-      {banks.length === 0 ? (
-        <EmptyState icon={<Building2 size={20} />} title="Belum ada bank" />
-      ) : (
-        <div className="space-y-2">
-          {banks.map((b) => (
-            <div
-              key={b.id}
-              className={cn(
-                "flex items-center justify-between rounded-lg border px-4 py-3",
-                b.active ? "border-border" : "border-border-light opacity-60",
-              )}
-            >
-              <div className="flex items-center gap-3">
-                <BankLogo bank={b} />
-                <div>
-                  <p className="text-sm font-medium text-text-primary">{b.name}</p>
-                  <Badge
-                    className={
-                      b.active ? "bg-success-soft text-success-strong" : "bg-slate-100 text-text-muted"
-                    }
-                  >
-                    {b.active ? "Aktif" : "Nonaktif"}
-                  </Badge>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <BankLogoActions
-                  bank={b}
-                  onLogo={async (logo) => {
-                    setError(null);
-                    try {
-                      const url = await upload.mutateAsync({ bucket: "bank-logos", file: await dataUrlToBlob(logo) });
-                      await updateBank.mutateAsync({ id: b.id, logo: url });
-                    } catch (e) {
-                      setError(e instanceof Error ? e.message : "Gagal mengunggah logo.");
-                    }
-                  }}
-                  onRemoveLogo={() => updateBank.mutate({ id: b.id, logo: null })}
-                  onToggle={() => updateBank.mutate({ id: b.id, active: !b.active })}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        data={banks}
+        initialSorting={[{ id: "name", desc: false }]}
+        searchPlaceholder="Cari bank…"
+        emptyTitle="Belum ada bank"
+      />
     </Card>
   );
 }

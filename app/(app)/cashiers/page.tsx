@@ -8,9 +8,12 @@ import { z } from "zod";
 import { Toggle } from "@/components/toggle";
 import { Badge, Button, Card, CardHeader, EmptyState, FormFieldError, Input, Label } from "@/components/ui";
 import { CashiersSkeleton } from "@/components/skeletons";
+import { DataTable } from "@/components/data-table";
 import { useCreateCashier, useUpdateCashier } from "@/lib/api/hooks";
 import { usePosStore } from "@/lib/use-pos-store";
 import { cashierCreateSchema } from "@/lib/schemas/cashier";
+import type { Cashier } from "@/lib/types";
+import type { ColumnDef } from "@tanstack/react-table";
 
 const cashierFormSchema = cashierCreateSchema.extend({
   password: z.string().min(6, "Password minimal 6 karakter"),
@@ -22,6 +25,59 @@ export default function CashiersPage() {
   const cashiers = usePosStore((s) => s.cashiers);
   const updateCashier = useUpdateCashier();
   const dataLoaded = usePosStore((s) => s.dataLoaded);
+
+  const columns: ColumnDef<Cashier, unknown>[] = [
+    {
+      id: "name",
+      accessorKey: "name",
+      header: "Nama",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
+            {row.original.name.charAt(0)}
+          </div>
+          <span className="truncate text-sm font-medium text-text-primary">{row.original.name}</span>
+        </div>
+      ),
+    },
+    {
+      id: "email",
+      accessorKey: "email",
+      header: "Email",
+      enableHiding: true,
+      cell: ({ row }) => (
+        <span className="text-text-secondary">{row.original.email}</span>
+      ),
+    },
+    {
+      id: "status",
+      accessorKey: "active",
+      header: "Status",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Badge
+          className={
+            row.original.active
+              ? "bg-success-soft text-success-strong"
+              : "bg-slate-100 text-text-muted"
+          }
+        >
+          {row.original.active ? "Aktif" : "Nonaktif"}
+        </Badge>
+      ),
+    },
+    {
+      id: "toggle",
+      header: "Aktif",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Toggle
+          checked={row.original.active}
+          onChange={(v) => updateCashier.mutate({ id: row.original.id, active: v })}
+        />
+      ),
+    },
+  ];
 
   if (user?.role !== "OWNER") {
     return (
@@ -54,31 +110,13 @@ export default function CashiersPage() {
             title={`${cashiers.length} kasir`}
             description="Kasir inactive tidak dapat login atau beroperasi."
           />
-          {cashiers.length === 0 ? (
-            <EmptyState icon={<UserRound size={20} />} title="Belum ada kasir" />
-          ) : (
-            <div className="divide-y divide-border-light">
-              {cashiers.map((c) => (
-                <div key={c.id} className="flex items-center gap-3 py-3">
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
-                    {c.name.charAt(0)}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-text-primary">{c.name}</p>
-                    <p className="truncate text-xs text-text-muted">{c.email}</p>
-                  </div>
-                  <Badge
-                    className={
-                      c.active ? "bg-success-soft text-success-strong" : "bg-slate-100 text-text-muted"
-                    }
-                  >
-                    {c.active ? "Aktif" : "Nonaktif"}
-                  </Badge>
-                  <Toggle checked={c.active} onChange={(v) => updateCashier.mutate({ id: c.id, active: v })} />
-                </div>
-              ))}
-            </div>
-          )}
+          <DataTable
+            columns={columns}
+            data={cashiers}
+            initialSorting={[{ id: "name", desc: false }]}
+            searchPlaceholder="Cari kasir…"
+            emptyTitle="Belum ada kasir"
+          />
           <p className="mt-3 border-t border-border pt-3 text-[11px] text-text-muted">
             Login demo oleh: {user?.name} ({user?.role})
           </p>

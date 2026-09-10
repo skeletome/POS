@@ -95,23 +95,117 @@ export async function listProducts(
 
   if (oErr) throw oErr;
 
-  const groupsByProduct = new Map<string, Map<string, typeof optionRows[number][]>>();
-  for (const g of groupRows ?? []) {
-    const gMap = groupsByProduct.get(g.product_id) ?? new Map();
+  return { products: mapToProducts(productRows ?? [], groupRows ?? [], optionRows ?? []) };
+}
+
+const PRODUCT_SORT_COLUMNS = {
+  name: "name",
+  dineInPrice: "dine_in_price",
+  takeawayPrice: "takeaway_price",
+  createdAt: "created_at",
+} as const;
+
+export type ProductSortBy = keyof typeof PRODUCT_SORT_COLUMNS;
+
+export interface ListProductsPageParams {
+  page: number;
+  pageSize: number;
+  search?: string;
+  categoryId?: string;
+  sortBy?: ProductSortBy;
+  sortDir?: "asc" | "desc";
+}
+
+export async function listProductsPage(
+  supabase: SupabaseClient,
+  storeId: string,
+  params: ListProductsPageParams,
+): Promise<{ products: Product[]; total: number }> {
+  const {
+    page,
+    pageSize,
+    search,
+    categoryId,
+    sortBy = "name",
+    sortDir = "asc",
+  } = params;
+
+  const base = supabase.from("products");
+  type ProductsQuery = ReturnType<typeof base.select>;
+
+  const withFilters = (q: ProductsQuery): ProductsQuery => {
+    let query = q.eq("store_id", storeId);
+    if (categoryId) query = query.eq("category_id", categoryId);
+    if (search) query = query.ilike("name", `%${search}%`);
+    return query;
+  };
+
+  // total untuk pagination (head: hanya count, tanpa body)
+  const { count: total, error: countError } = await withFilters(
+    base.select("id", { count: "exact", head: true }),
+  );
+  if (countError) throw countError;
+
+  const col = PRODUCT_SORT_COLUMNS[sortBy];
+  const start = (page - 1) * pageSize;
+  const end = start + pageSize - 1;
+
+  // ambil data halaman: filter + urutkan -> range
+  const { data: productRows, error: pErr } = await withFilters(
+    base.select("*").order(col, { ascending: sortDir !== "desc" }),
+  ).range(start, end);
+
+  if (pErr) throw pErr;
+
+  const pageIds = ((productRows ?? []) as ProductRow[]).map((p) => p.id);
+  const { data: groupRows, error: gErr } = pageIds.length
+    ? await supabase
+        .from("option_groups")
+        .select("*")
+        .eq("store_id", storeId)
+        .in("product_id", pageIds)
+        .order("sort_order")
+    : { data: [], error: null };
+
+  if (gErr) throw gErr;
+
+  const groupIds = ((groupRows ?? []) as OptionGroupRow[]).map((g) => g.id);
+  const { data: optionRows, error: oErr } = groupIds.length
+    ? await supabase.from("options").select("*").in("option_group_id", groupIds).order("sort_order")
+    : { data: [], error: null };
+
+  if (oErr) throw oErr;
+
+  return {
+    products: mapToProducts(
+      (productRows ?? []) as ProductRow[],
+      (groupRows ?? []) as OptionGroupRow[],
+      (optionRows ?? []) as OptionRow[],
+    ),
+    total: total ?? 0,
+  };
+}
+
+function mapToProducts(
+  productRows: ProductRow[],
+  groupRows: OptionGroupRow[],
+  optionRows: OptionRow[],
+): Product[] {
+  const groupsByProduct = new Map<string, Map<string, OptionRow[]>>();
+  for (const g of groupRows) {
+    const gMap = groupsByProduct.get(g.product_id) ?? new Map<string, OptionRow[]>();
     gMap.set(g.id, []);
     groupsByProduct.set(g.product_id, gMap);
   }
-  for (const o of optionRows ?? []) {
-    const gMap = groupsByProduct.get(
-      (groupRows ?? []).find((g) => g.id === o.option_group_id)?.product_id ?? "",
-    );
-    gMap?.get(o.option_group_id)?.push(o);
+  for (const o of optionRows) {
+    const parent = groupRows.find((g) => g.id === o.option_group_id);
+    groupsByProduct.get(parent?.product_id ?? "")?.get(o.option_group_id)?.push(o);
   }
 
-  const products = (productRows ?? []).map((p) => {
-    const gMap = groupsByProduct.get(p.id) ?? new Map();
+  return productRows.map((p) => {
+    const gMap = groupsByProduct.get(p.id) ?? new Map<string, OptionRow[]>();
     const groups = Array.from(gMap.entries()).map(([groupId, options]) => {
-      const g = (groupRows ?? []).find((x) => x.id === groupId);
+      const g = groupRows.find((x) => x.id === groupId);
       return {
         id: groupId,
         name: g?.name ?? "",
@@ -122,8 +216,6 @@ export async function listProducts(
     });
     return toProduct(p, groups);
   });
-
-  return { products };
 }
 
 export function productToRow(input: ProductInput, storeId: string): ProductRow {

@@ -31,6 +31,8 @@ import { formatRupiah } from "@/lib/format";
 import { paymentMethodLabels } from "@/lib/dummy-data";
 import { usePosStore } from "@/lib/use-pos-store";
 import type { PaymentMethod } from "@/lib/types";
+import type { ColumnDef } from "@tanstack/react-table";
+import { DataTable } from "@/components/data-table";
 
 function StatCard({
   label,
@@ -123,6 +125,43 @@ export default function DashboardPage() {
     }
     return [...m.values()].sort((a, b) => b.qty - a.qty).slice(0, 5);
   }, [filtered]);
+
+  const topProductColumns: ColumnDef<{ name: string; qty: number; revenue: number }, unknown>[] = [
+    {
+      id: "name",
+      accessorKey: "name",
+      header: "Produk",
+      cell: ({ row }) => {
+        const product = products.find((x) => x.name === row.original.name);
+        return (
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-50 text-sm">
+              {product?.emoji ?? "🍽️"}
+            </span>
+            <span className="font-medium text-text-primary">{row.original.name}</span>
+          </div>
+        );
+      },
+    },
+    {
+      id: "qty",
+      accessorKey: "qty",
+      header: () => <div className="text-right">Quantity</div>,
+      cell: ({ row }) => (
+        <div className="text-right text-text-secondary">{row.original.qty}</div>
+      ),
+    },
+    {
+      id: "revenue",
+      accessorKey: "revenue",
+      header: () => <div className="text-right">Revenue</div>,
+      cell: ({ row }) => (
+        <div className="text-right font-medium text-text-primary">
+          {formatRupiah(row.original.revenue)}
+        </div>
+      ),
+    },
+  ];
 
   const paymentSummary = useMemo(() => {
     const base: Record<PaymentMethod, { count: number; total: number }> = {
@@ -284,46 +323,14 @@ export default function DashboardPage() {
             </Link>
           }
         />
-        {topProducts.length === 0 ? (
-          <EmptyState
-            icon={<ShoppingBag size={20} />}
-            title="Belum ada data"
-            description="Tidak ada produk terjual pada periode ini."
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-text-muted">
-                  <th className="pb-2 pr-4 font-medium">Produk</th>
-                  <th className="pb-2 pr-4 font-medium">Quantity</th>
-                  <th className="pb-2 font-medium">Revenue</th>
-                </tr>
-              </thead>
-              <tbody>
-                {topProducts.map((p) => {
-                  const product = products.find((x) => x.name === p.name);
-                  return (
-                    <tr key={p.name} className="border-b border-border-light last:border-0">
-                      <td className="py-2.5 pr-4">
-                        <div className="flex items-center gap-3">
-                          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-50 text-sm">
-                            {product?.emoji ?? "🍽️"}
-                          </span>
-                          <span className="font-medium text-text-primary">{p.name}</span>
-                        </div>
-                      </td>
-                      <td className="py-2.5 pr-4 text-text-secondary">{p.qty}</td>
-                      <td className="py-2.5 font-medium text-text-primary">
-                        {formatRupiah(p.revenue)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          columns={topProductColumns}
+          data={topProducts}
+          searchable={false}
+          emptyTitle="Belum ada data"
+          emptyDescription="Tidak ada produk terjual pada periode ini."
+          emptyIcon={<ShoppingBag size={20} />}
+        />
       </Card>
       </>}
     </div>

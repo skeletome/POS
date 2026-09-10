@@ -1,6 +1,6 @@
 "use client";
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/api/keys";
 import type { Product, ProductInput } from "@/lib/schemas";
 import type { Bank, Category, Cashier, Transaction, TaxSettings, PaymentSettings } from "@/lib/types";
@@ -45,13 +45,52 @@ export function useMe() {
 
 export function useProducts() {
   return useQuery({
-    queryKey: queryKeys.products,
+    queryKey: queryKeys.products.all,
     queryFn: async () => {
       const res = await fetch("/api/products");
       if (!res.ok) return handleError(res);
       const { data } = (await res.json()) as { data: { products: Product[] } };
       return data.products;
     },
+  });
+}
+
+export interface ProductsPageParams {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+  categoryId?: string;
+  sortBy?: "name" | "dineInPrice" | "takeawayPrice" | "createdAt";
+  sortDir?: "asc" | "desc";
+}
+
+export interface ProductsPageData {
+  products: Product[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export function useProductsPage(params: ProductsPageParams = {}) {
+  const { page = 1, pageSize = 10, ...filters } = params;
+  return useQuery({
+    queryKey: queryKeys.products.page(params),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const sp = new URLSearchParams();
+      sp.set("page", String(page));
+      sp.set("pageSize", String(pageSize));
+      for (const [key, value] of Object.entries(filters)) {
+        if (value !== undefined && value !== "") sp.set(key, String(value));
+      }
+      const res = await fetch(`/api/products?${sp.toString()}`);
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: ProductsPageData };
+      return data;
+    },
+    retry: 1,
   });
 }
 
@@ -68,7 +107,7 @@ export function useCategories() {
 }
 
 const invalidateProducts = (queryClient: ReturnType<typeof useQueryClient>) => {
-  void queryClient.invalidateQueries({ queryKey: queryKeys.products });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
 };
 
 export function useCreateProduct() {
@@ -320,6 +359,50 @@ export function useTransactions(from?: string, to?: string) {
       const { data } = (await res.json()) as { data: { transactions: Transaction[] } };
       return data.transactions;
     },
+  });
+}
+
+export interface TransactionsPageParams {
+  page?: number;
+  pageSize?: number;
+  from?: string;
+  to?: string;
+  search?: string;
+  status?: string;
+  payment?: string;
+  orderType?: string;
+  cashier?: string;
+  sortBy?: "createdAt" | "total";
+  sortDir?: "asc" | "desc";
+}
+
+export interface TransactionsPageData {
+  transactions: Transaction[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export function useTransactionsPage(params: TransactionsPageParams = {}) {
+  const { page = 1, pageSize = 10, ...filters } = params;
+  return useQuery({
+    queryKey: queryKeys.transactions.page(params),
+    placeholderData: keepPreviousData,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    queryFn: async () => {
+      const sp = new URLSearchParams();
+      sp.set("page", String(page));
+      sp.set("pageSize", String(pageSize));
+      for (const [key, value] of Object.entries(filters)) {
+        if (value !== undefined && value !== "") sp.set(key, String(value));
+      }
+      const res = await fetch(`/api/transactions?${sp.toString()}`);
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: TransactionsPageData };
+      return data;
+    },
+    retry: 1,
   });
 }
 

@@ -1,30 +1,83 @@
 "use client";
 
-import { ArrowLeft, Ban, CreditCard, QrCode, ReceiptText, Wallet } from "lucide-react";
+import { ArrowLeft, Ban, CreditCard, Printer, QrCode, ReceiptText, Wallet } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { Button, Card, StatusBadge } from "@/components/ui";
+import { Button, Card, EmptyState, Modal, StatusBadge } from "@/components/ui";
 import { formatDateTime, formatRupiah } from "@/lib/format";
 import { orderTypeLabels, paymentMethodLabels } from "@/lib/dummy-data";
 import { usePosStore } from "@/lib/use-pos-store";
-import { useUpdateTransactionStatus } from "@/lib/api/hooks";
+import { useTransaction, useUpdateTransactionStatus } from "@/lib/api/hooks";
+import type { Transaction } from "@/lib/types";
+
+const PDFPreview = dynamic(
+  () => import("@/components/pos/pdf-preview"),
+  { ssr: false },
+);
+
+type PrintTrx = { transaction: Transaction; url: string } | null;
 
 export default function TransactionDetailPage() {
   const params = useParams<{ id: string }>();
-  const transaction = usePosStore((s) => s.transactions.find((t) => t.id === params.id));
+  const fromStore = usePosStore((s) => s.transactions.find((t) => t.id === params.id));
   const user = usePosStore((s) => s.user);
+  const storeSettings = usePosStore((s) => s.storeSettings);
+  const { data: fetched, isLoading: detailLoading } = useTransaction(params.id);
+  const transaction = fromStore ?? fetched;
   const updateStatus = useUpdateTransactionStatus(transaction?.id ?? "");
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [printTrx, setPrintTrx] = useState<PrintTrx>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  useEffect(() => {
+    return () => {
+      if (printTrx) URL.revokeObjectURL(printTrx.url);
+    };
+  }, [printTrx]);
+
+  const handlePrint = async (trx: Transaction) => {
+    setPrinting(true);
+    setPrintTrx(null);
+    try {
+      const { generateReceiptUrl } = await import("@/lib/receipt-pdf");
+      const url = await generateReceiptUrl(
+        trx,
+        storeSettings.storeName,
+        storeSettings.information,
+      );
+      setPrintTrx({ transaction: trx, url });
+    } catch {
+      setPrintTrx(null);
+    } finally {
+      setPrinting(false);
+      setPreviewOpen(true);
+    }
+  };
+
+  if (!transaction && detailLoading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <div className="text-sm text-text-muted">Memuat transaksi…</div>
+      </div>
+    );
+  }
 
   if (!transaction) {
     return (
-      <div className="flex flex-col items-center gap-3 py-24 text-center">
-        <ReceiptText size={32} className="text-text-placeholder" />
-        <p className="text-sm font-medium text-text-primary">Transaksi tidak ditemukan</p>
-        <Link href="/transactions">
-          <Button variant="secondary">Kembali ke Riwayat</Button>
-        </Link>
+      <div className="py-10">
+        <EmptyState
+          icon={<ReceiptText size={20} />}
+          title="Transaksi tidak ditemukan"
+          description="Transaksi yang Anda cari tidak tersedia."
+          action={
+            <Link href="/transactions">
+              <Button variant="secondary">Kembali ke Riwayat</Button>
+            </Link>
+          }
+        />
       </div>
     );
   }
@@ -54,6 +107,14 @@ export default function TransactionDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            disabled={printing}
+            onClick={() => void handlePrint(transaction)}
+          >
+            <Printer size={16} />
+            {printing ? "Menyiapkan…" : "Cetak Struk"}
+          </Button>
           <StatusBadge status={transaction.status} />
           {cancelable ? (
             <Button
@@ -155,6 +216,37 @@ export default function TransactionDetailPage() {
           </Card>
         </div>
       </div>
+
+      <Modal
+        open={previewOpen}
+        onClose={() => setPreviewOpen(false)}
+        title="Cetak Struk"
+        width="max-w-3xl"
+      >
+        {printTrx ? (
+          <div>
+            <PDFPreview url={printTrx.url} />
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setPreviewOpen(false)}>
+                Tutup
+              </Button>
+              <a
+                href={printTrx.url}
+                download={`struk-${printTrx.transaction.id}.pdf`}
+              >
+                <Button type="button">
+                  <Printer size={16} />
+                  Unduh / Cetak PDF
+                </Button>
+              </a>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-error-strong">
+            Gagal membuat struk PDF. Coba lagi.
+          </p>
+        )}
+      </Modal>
     </div>
   );
 }

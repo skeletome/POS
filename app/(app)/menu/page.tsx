@@ -1,7 +1,7 @@
 "use client";
 
-import { Plus, Pencil, Search, Trash2, UtensilsCrossed } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Plus, Pencil, Trash2, UtensilsCrossed } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Toggle } from "@/components/toggle";
@@ -10,7 +10,6 @@ import {
   Button,
   Card,
   CardHeader,
-  EmptyState,
   FormFieldError,
   Input,
   Label,
@@ -19,11 +18,13 @@ import {
   Textarea,
 } from "@/components/ui";
 import { MenuSkeleton } from "@/components/skeletons";
+import { DataTable, DataTableColumnHeader } from "@/components/data-table";
 import { cn } from "@/lib/cn";
 import { formatRupiah } from "@/lib/format";
-import { useCreateProduct, useDeleteProduct, useUpdateProduct, useUploadImage } from "@/lib/api/hooks";
+import { useCreateProduct, useDeleteProduct, useUpdateProduct, useUploadImage, useProductsPage, type ProductsPageParams } from "@/lib/api/hooks";
 import { usePosStore } from "@/lib/use-pos-store";
 import { productSchema, type Product } from "@/lib/schemas/product";
+import type { ColumnDef, SortingState } from "@tanstack/react-table";
 
 const uid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -51,9 +52,13 @@ export default function MenuPage() {
   const categories = usePosStore((s) => s.categories);
   const dataLoaded = usePosStore((s) => s.dataLoaded);
 
-  const [query, setQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("ALL");
-  const [sortBy, setSortBy] = useState<"name" | "priceAsc" | "priceDesc">("name");
+  const [searchInput, setSearchInput] = useState("");
+  const [search, setSearch] = useState("");
+  const [pageMeta, setPageMeta] = useState({ page: 1, pageSize: 30 });
+  const [sortBy, setSortBy] = useState<"name" | "dineInPrice" | "takeawayPrice">("name");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [filterVersion, setFilterVersion] = useState(0);
   const [editing, setEditing] = useState<Product | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
@@ -63,17 +68,30 @@ export default function MenuPage() {
   const updateProduct = useUpdateProduct(editing?.id ?? "");
   const deleteProduct = useDeleteProduct();
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = products.filter(
-      (p) =>
-        (categoryFilter === "ALL" || p.categoryId === categoryFilter) &&
-        (!q || p.name.toLowerCase().includes(q)),
-    );
-    if (sortBy === "priceAsc") return [...list].sort((a, b) => a.dineInPrice - b.dineInPrice);
-    if (sortBy === "priceDesc") return [...list].sort((a, b) => b.dineInPrice - a.dineInPrice);
-    return list;
-  }, [products, query, categoryFilter, sortBy]);
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  useEffect(() => {
+    setFilterVersion((v) => v + 1);
+  }, [search]);
+
+  const bumpFilters = () => setFilterVersion((v) => v + 1);
+
+  const params = useMemo<ProductsPageParams>(
+    () => ({
+      page: pageMeta.page,
+      pageSize: pageMeta.pageSize,
+      search: search || undefined,
+      categoryId: categoryFilter === "ALL" ? undefined : categoryFilter,
+      sortBy,
+      sortDir,
+    }),
+    [pageMeta, search, categoryFilter, sortBy, sortDir],
+  );
+
+  const { data: pageData, isLoading, isFetching } = useProductsPage(params);
 
   const categoryName = (id: string) => categories.find((c) => c.id === id)?.name ?? "—";
 
@@ -109,6 +127,103 @@ export default function MenuPage() {
     }
   };
 
+  const columns: ColumnDef<Product, unknown>[] = [
+    {
+      id: "name",
+      accessorKey: "name",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Produk" />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-base">
+            {row.original.emoji ?? "🍽️"}
+          </span>
+          <div className="min-w-0">
+            <p className="truncate font-medium text-text-primary">{row.original.name}</p>
+            {row.original.optionGroups.length > 0 ? (
+              <p className="text-xs text-text-muted">
+                {row.original.optionGroups.length} grup opsi
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: "category",
+      accessorKey: "categoryId",
+      header: "Kategori",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="text-text-secondary">{categoryName(row.original.categoryId)}</span>
+      ),
+    },
+    {
+      id: "dineInPrice",
+      accessorKey: "dineInPrice",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Dine-in" />,
+      cell: ({ row }) => (
+        <span className="font-medium text-text-primary">{formatRupiah(row.original.dineInPrice)}</span>
+      ),
+    },
+    {
+      id: "takeawayPrice",
+      accessorKey: "takeawayPrice",
+      header: ({ column }) => <DataTableColumnHeader column={column} title="Takeaway" />,
+      cell: ({ row }) => (
+        <span className="font-medium text-text-primary">{formatRupiah(row.original.takeawayPrice)}</span>
+      ),
+    },
+    {
+      id: "status",
+      accessorKey: "active",
+      header: "Status",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Badge
+          className={
+            row.original.active
+              ? "bg-success-soft text-success-strong"
+              : "bg-slate-100 text-text-muted"
+          }
+        >
+          {row.original.active ? "Aktif" : "Nonaktif"}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <div className="flex justify-end gap-1">
+          <button
+            onClick={() => openEdit(row.original)}
+            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-slate-50 hover:text-primary-500"
+            aria-label="Edit"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onClick={() => setConfirmDelete(row.original)}
+            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-error-soft hover:text-error-strong"
+            aria-label="Hapus"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ),
+    },
+  ];
+
+  const handleSortingChange = (sorting: SortingState) => {
+    const s = sorting[0];
+    setSortBy(
+      s && (s.id === "dineInPrice" || s.id === "takeawayPrice") ? s.id : "name",
+    );
+    setSortDir(s ? (s.desc ? "desc" : "asc") : "asc");
+  };
+
   return (
     <div className="space-y-5">
       <div>
@@ -125,132 +240,49 @@ export default function MenuPage() {
 
       <Card>
         <CardHeader
-          title={`${filtered.length} produk`}
+          title={`${pageData?.total ?? 0} produk`}
           description="Produk inactive tidak muncul pada POS untuk transaksi baru."
           action={
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative">
-                <Search
-                  size={16}
-                  className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
-                />
-                <Input
-                  className="w-48 pl-9"
-                  placeholder="Cari produk…"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                />
-              </div>
-              <Select
-                className="w-44"
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-              >
-                <option value="ALL">Semua Kategori</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </Select>
-              <Select
-                className="w-44"
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              >
-                <option value="name">Urut: Nama</option>
-                <option value="priceAsc">Harga: Termurah</option>
-                <option value="priceDesc">Harga: Termahal</option>
-              </Select>
-            </div>
+            <Select
+              className="w-44"
+              value={categoryFilter}
+              onChange={(e) => {
+                setCategoryFilter(e.target.value);
+                bumpFilters();
+              }}
+            >
+              <option value="ALL">Semua Kategori</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </Select>
           }
         />
 
-        {filtered.length === 0 ? (
-          <EmptyState
-            icon={<UtensilsCrossed size={20} />}
-            title="Belum ada produk"
-            description="Tambahkan produk pertama Anda untuk mulai menjual."
-          />
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b border-border text-xs text-text-muted">
-                  <th className="pb-2 pr-4 font-medium">Produk</th>
-                  <th className="pb-2 pr-4 font-medium">Kategori</th>
-                  <th className="pb-2 pr-4 font-medium">Dine-in</th>
-                  <th className="pb-2 pr-4 font-medium">Takeaway</th>
-                  <th className="pb-2 pr-4 font-medium">Status</th>
-                  <th className="pb-2 pr-4 text-right font-medium">Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((p) => (
-                  <tr
-                    key={p.id}
-                    className={cn(
-                      "border-b border-border-light transition-colors last:border-0 hover:bg-slate-50",
-                      !p.active && "opacity-60",
-                    )}
-                  >
-                    <td className="py-3 pr-4">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50 text-base">
-                          {p.emoji ?? "🍽️"}
-                        </span>
-                        <div className="min-w-0">
-                          <p className="truncate font-medium text-text-primary">{p.name}</p>
-                          {p.optionGroups.length > 0 ? (
-                            <p className="text-xs text-text-muted">
-                              {p.optionGroups.length} grup opsi
-                            </p>
-                          ) : null}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4 text-text-secondary">{categoryName(p.categoryId)}</td>
-                    <td className="py-3 pr-4 font-medium text-text-primary">
-                      {formatRupiah(p.dineInPrice)}
-                    </td>
-                    <td className="py-3 pr-4 font-medium text-text-primary">
-                      {formatRupiah(p.takeawayPrice)}
-                    </td>
-                    <td className="py-3 pr-4">
-                      <Badge
-                        className={
-                          p.active
-                            ? "bg-success-soft text-success-strong"
-                            : "bg-slate-100 text-text-muted"
-                        }
-                      >
-                        {p.active ? "Aktif" : "Nonaktif"}
-                      </Badge>
-                    </td>
-                    <td className="py-3 text-right">
-                      <div className="flex justify-end gap-1">
-                        <button
-                          onClick={() => openEdit(p)}
-                          className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-slate-50 hover:text-primary-500"
-                          aria-label="Edit"
-                        >
-                          <Pencil size={16} />
-                        </button>
-                        <button
-                          onClick={() => setConfirmDelete(p)}
-                          className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-error-soft hover:text-error-strong"
-                          aria-label="Hapus"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <DataTable
+          columns={columns}
+          data={pageData?.products ?? []}
+          loading={isLoading}
+          fetching={isFetching}
+          initialSorting={[{ id: "name", desc: false }]}
+          searchPlaceholder="Cari produk…"
+          controlledSearch
+          searchValue={searchInput}
+          onSearchChange={setSearchInput}
+          emptyTitle="Belum ada produk"
+          emptyDescription="Tambahkan produk pertama Anda untuk mulai menjual."
+          emptyIcon={<UtensilsCrossed size={20} />}
+          manualPagination
+          rowCount={pageData?.total ?? 0}
+          onPaginationChange={(pageIndex, pageSize) =>
+            setPageMeta({ page: pageIndex + 1, pageSize })
+          }
+          resetKey={filterVersion}
+          manualSorting
+          onSortingChange={handleSortingChange}
+        />
       </Card>
 
       {editing ? (

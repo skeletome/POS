@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus, Pencil, Store, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -10,16 +10,16 @@ import {
   Button,
   Card,
   CardHeader,
-  EmptyState,
   FormFieldError,
   Input,
   Modal,
 } from "@/components/ui";
 import { CategoriesSkeleton } from "@/components/skeletons";
-import { cn } from "@/lib/cn";
+import { DataTable } from "@/components/data-table";
 import { useCreateCategory, useDeleteCategory, useUpdateCategory } from "@/lib/api/hooks";
 import { usePosStore } from "@/lib/use-pos-store";
 import { categoryCreateSchema, categorySchema, type Category } from "@/lib/schemas/category";
+import type { ColumnDef } from "@tanstack/react-table";
 
 export default function CategoriesPage() {
   const categories = usePosStore((s) => s.categories);
@@ -29,6 +29,59 @@ export default function CategoriesPage() {
   const createCat = useCreateCategory();
   const updateCat = useUpdateCategory(editing?.id ?? "");
   const deleteCat = useDeleteCategory();
+
+  const columns: ColumnDef<Category, unknown>[] = [
+    {
+      id: "name",
+      accessorKey: "name",
+      header: "Nama",
+      cell: ({ row }) => (
+        <span className="text-sm font-medium text-text-primary">{row.original.name}</span>
+      ),
+    },
+    {
+      id: "status",
+      accessorKey: "active",
+      header: "Status",
+      enableSorting: false,
+      cell: ({ row }) => (
+        <Badge
+          className={
+            row.original.active
+              ? "bg-success-soft text-success-strong"
+              : "bg-slate-100 text-text-muted"
+          }
+        >
+          {row.original.active ? "Aktif" : "Nonaktif"}
+        </Badge>
+      ),
+    },
+    {
+      id: "actions",
+      header: "",
+      enableSorting: false,
+      enableHiding: false,
+      cell: ({ row }) => (
+        <div className="flex justify-end gap-1">
+          <button
+            onClick={() => setEditing(row.original)}
+            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-slate-50 hover:text-primary-500"
+            aria-label="Edit"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            onClick={() => deleteCat.mutate(row.original.id)}
+            disabled={deleteCat.isPending}
+            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-error-soft hover:text-error-strong disabled:opacity-50"
+            aria-label="Nonaktifkan"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-5">
@@ -44,44 +97,17 @@ export default function CategoriesPage() {
       </Card>
 
       <Card className="max-w-xl">
-        <CardHeader title={`${categories.length} kategori`} description="Kategori inactive tidak muncul pada filter POS." />
-        {categories.length === 0 ? (
-          <EmptyState icon={<Store size={20} />} title="Belum ada kategori" />
-        ) : (
-          <div className="divide-y divide-border-light">
-            {categories.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 py-3">
-                <div className="flex-1">
-                  <p className={cn("text-sm font-medium", c.active ? "text-text-primary" : "text-text-muted")}>
-                    {c.name}
-                  </p>
-                </div>
-                <Badge
-                  className={
-                    c.active ? "bg-success-soft text-success-strong" : "bg-slate-100 text-text-muted"
-                  }
-                >
-                  {c.active ? "Aktif" : "Nonaktif"}
-                </Badge>
-                <button
-                  onClick={() => setEditing(c)}
-                  className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-slate-50 hover:text-primary-500"
-                  aria-label="Edit"
-                >
-                  <Pencil size={16} />
-                </button>
-                <button
-                  onClick={() => deleteCat.mutate(c.id)}
-                  disabled={deleteCat.isPending}
-                  className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-error-soft hover:text-error-strong disabled:opacity-50"
-                  aria-label="Nonaktifkan"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+        <CardHeader
+          title={`${categories.length} kategori`}
+          description="Kategori inactive tidak muncul pada filter POS."
+        />
+        <DataTable
+          columns={columns}
+          data={categories}
+          initialSorting={[{ id: "name", desc: false }]}
+          searchPlaceholder="Cari kategori…"
+          emptyTitle="Belum ada kategori"
+        />
       </Card>
 
       <Modal open={!!editing} onClose={() => setEditing(null)} title="Ubah Kategori" width="max-w-sm">
