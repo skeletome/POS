@@ -3,23 +3,26 @@
 import {
   ArrowUpRight,
   Banknote,
-  CalendarDays,
-  CalendarRange,
   CreditCard,
   QrCode,
   ReceiptText,
-  Settings2,
   ShoppingBag,
   TrendingUp,
-  Calendar as CalendarIcon,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { CustomRangePicker } from "@/components/date-range-picker";
 import { PaymentPieChart, SalesAreaChart } from "@/components/dashboard-charts";
 import { Button, Card, CardHeader, EmptyState } from "@/components/ui";
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { DashboardSkeleton } from "@/components/skeletons";
-import { cn } from "@/lib/cn";
 import {
   dateRangePresets,
   getRange,
@@ -68,6 +71,10 @@ export default function DashboardPage() {
   const dataLoaded = usePosStore((s) => s.dataLoaded);
   const [rangeKey, setRangeKey] = useState<DateRangeKey>("today");
   const [customRange, setCustomRange] = useState<CustomRange | null>(null);
+
+  const rangeItems: { label: string; value: DateRangeKey }[] = dateRangePresets.map(
+    (p) => ({ label: p.label, value: p.key }),
+  );
 
   const range = useMemo(
     () => getRange(rangeKey, new Date(), customRange ?? undefined),
@@ -202,33 +209,26 @@ export default function DashboardPage() {
             </h2>
             <p className="text-sm text-text-muted">Ringkasan performa toko Anda.</p>
           </div>
-          <div className="flex flex-wrap gap-1.5 rounded-xl bg-slate-50 p-1.5 ring-1 ring-slate-100">
-            {dateRangePresets.map((p) => {
-              const active = rangeKey === p.key;
-              const icons: Record<DateRangeKey, React.ReactNode> = {
-                today: <CalendarDays size={14} />,
-                thisWeek: <CalendarRange size={14} />,
-                thisMonth: <CalendarIcon size={14} />,
-                custom: <Settings2 size={14} />,
-              };
-              return (
-                <button
-                  key={p.key}
-                  onClick={() => setRangeKey(p.key)}
-                  aria-pressed={active}
-                  className={cn(
-                    "flex cursor-pointer items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-semibold transition-all duration-150 active:scale-95",
-                    active
-                      ? "bg-primary-500 text-white shadow-md ring-2 ring-primary-200"
-                      : "bg-white text-text-primary shadow-sm hover:bg-slate-100",
-                  )}
-                >
-                  {icons[p.key]}
-                  {p.label}
-                </button>
-              );
-            })}
-          </div>
+          <Select
+            items={rangeItems}
+            value={rangeKey}
+            onValueChange={(value) => {
+              if (value) setRangeKey(value);
+            }}
+          >
+            <SelectTrigger className="w-44">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                {rangeItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </div>
         {rangeKey === "custom" ? (
           <div className="mt-3">

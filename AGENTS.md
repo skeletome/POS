@@ -53,6 +53,14 @@ POS (point-of-sale) app — Next.js 16.3.4 (Turbopack), React 19, TypeScript, Ta
 - Jangan pernah expose service role key (server-only)
 - Respect RLS; authorization tidak boleh hanya di frontend
 
+## Git Workflow
+
+- **JANGAN pernah commit, push, atau merge ke `development` / `main` sendiri.**
+- Push/merge ke `development` atau `main` HANYA dilakukan setelah user **secara eksplisit memerintah** ("push sekarang", "merge ke main", dll.) + **konfirmasi final** dari user.
+- Default: kerjakan perubahan lokal tanpa push; tunggu instruksi.
+- Sebelum push: verifikasi tidak ada file `.env*`, secret, atau key yang ikut ter-stage.
+- Jika ingin push tapi belum diperintah → TANYA dulu, jangan dieksekusi.
+
 ## Workflow
 
 Sebelum implementasi fitur:
@@ -71,3 +79,4 @@ Sebelum implementasi fitur:
 - Pakai `any`
 - Bypass RLS
 - Bocorkan `.env` / expose key di client
+- Push/merge ke `development` / `main` tanpa perintah & konfirmasi eksplisit dari user
