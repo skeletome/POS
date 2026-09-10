@@ -34,12 +34,14 @@ export async function GET() {
     if (error) return jsonError("Gagal memuat daftar kasir.", 500);
 
     const rows = (data as CashierRow[]) ?? [];
-    const cashiers: Cashier[] = rows.map((r) => ({
-      id: r.user_id,
-      name: r.name,
-      email: r.email,
-      active: r.active,
-    }));
+    const cashiers: Cashier[] = rows
+      .filter((r) => r.role === "CASHIER")
+      .map((r) => ({
+        id: r.user_id,
+        name: r.name,
+        email: r.email,
+        active: r.active,
+      }));
 
     return NextResponse.json({ data: { cashiers } });
   } catch {
@@ -130,4 +132,5 @@ interface CashierRow {
   name: string;
   email: string;
   active: boolean;
+  role: string;
 }
