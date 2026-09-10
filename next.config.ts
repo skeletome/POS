@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
-const PUBLIC_ENV_ALLOWLIST = ["NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_ANON_KEY"];
+const PUBLIC_ENV_ALLOWLIST = [
+  "NEXT_PUBLIC_SUPABASE_URL",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+];
 
 const leakedEnv = Object.keys(process.env).filter(
   (k) =>
