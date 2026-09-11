@@ -183,7 +183,7 @@ export default function MenuPage() {
           className={
             row.original.active
               ? "bg-success-soft text-success-strong"
-              : "bg-slate-100 text-text-muted"
+              : "bg-muted text-text-muted"
           }
         >
           {row.original.active ? "Aktif" : "Nonaktif"}
@@ -199,7 +199,7 @@ export default function MenuPage() {
         <div className="flex justify-end gap-1">
           <button
             onClick={() => openEdit(row.original)}
-            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-slate-50 hover:text-primary-500"
+            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-muted hover:text-primary-500"
             aria-label="Edit"
           >
             <Pencil size={16} />
@@ -493,7 +493,7 @@ function ProductFormModal({
                   e.target.value = "";
                 }}
               />
-              <span className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-lg border border-border bg-white px-3 text-sm font-medium text-text-primary hover:bg-surface-secondary">
+              <span className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text-primary hover:bg-surface-secondary">
                 <Plus size={14} />
                 {uploading ? "Mengunggah…" : watch("image") ? "Ganti" : "Unggah"}
               </span>

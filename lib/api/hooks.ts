@@ -3,8 +3,23 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/lib/api/keys";
 import type { Product, ProductInput } from "@/lib/schemas";
-import type { Bank, Category, Cashier, Transaction, TaxSettings, PaymentSettings } from "@/lib/types";
-import type { TransactionCreateInput } from "@/lib/schemas";
+import type {
+  Bank,
+  Category,
+  Cashier,
+  Transaction,
+  TaxSettings,
+  PaymentSettings,
+  ProductDiscount,
+  Voucher,
+} from "@/lib/types";
+import type {
+  TransactionCreateInput,
+  ProductDiscountInput,
+  VoucherInput,
+  VoucherUpdateInput,
+} from "@/lib/schemas";
+import type { ProductDiscountUpdateInput } from "@/lib/schemas/discount";
 
 interface ApiError {
   error?: { message?: string; code?: string };
@@ -479,5 +494,117 @@ export function useReports(from?: Date, to?: Date) {
       const { data } = (await res.json()) as { data: ReportsData };
       return data;
     },
+  });
+}
+
+export function useDiscounts() {
+  return useQuery({
+    queryKey: queryKeys.discounts,
+    queryFn: async () => {
+      const res = await fetch("/api/discounts");
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: { discounts: ProductDiscount[] } };
+      return data.discounts;
+    },
+  });
+}
+
+export function useCreateDiscount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ProductDiscountInput) => {
+      const res = await fetch("/api/discounts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.discounts }),
+  });
+}
+
+export function useUpdateDiscount(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: ProductDiscountUpdateInput) => {
+      const res = await fetch(`/api/discounts/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.discounts }),
+  });
+}
+
+export function useDeleteDiscount() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/discounts/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.discounts }),
+  });
+}
+
+export function useVouchers() {
+  return useQuery({
+    queryKey: queryKeys.vouchers,
+    queryFn: async () => {
+      const res = await fetch("/api/vouchers");
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: { vouchers: Voucher[] } };
+      return data.vouchers;
+    },
+  });
+}
+
+export function useCreateVoucher() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: VoucherInput) => {
+      const res = await fetch("/api/vouchers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.vouchers }),
+  });
+}
+
+export function useUpdateVoucher(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: VoucherUpdateInput) => {
+      const res = await fetch(`/api/vouchers/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.vouchers }),
+  });
+}
+
+export function useDeleteVoucher() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/vouchers/${encodeURIComponent(id)}`, { method: "DELETE" });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: queryKeys.vouchers }),
   });
 }

@@ -25,11 +25,11 @@ export function Button({
         variant === "primary" &&
           "bg-primary-500 text-white hover:bg-primary-600 active:bg-primary-700",
         variant === "secondary" &&
-          "border border-border bg-white text-text-primary hover:bg-surface-secondary active:bg-border-light",
+          "border border-border bg-surface text-text-primary hover:bg-surface-secondary active:bg-border-light",
         variant === "ghost" &&
-          "bg-transparent text-text-secondary hover:bg-slate-50",
+          "bg-transparent text-text-secondary hover:bg-muted",
         variant === "danger" &&
-          "border border-border bg-white text-error-strong hover:bg-error-soft",
+          "border border-border bg-surface text-error-strong hover:bg-error-soft",
         className,
       )}
       {...props}
@@ -214,7 +214,7 @@ export function Modal({
               <h2 className="text-base font-semibold text-text-primary">{title}</h2>
               <button
                 onClick={onClose}
-                className="cursor-pointer rounded-lg p-1.5 text-text-muted transition-colors hover:bg-slate-50 hover:text-text-primary"
+                className="cursor-pointer rounded-lg p-1.5 text-text-muted transition-colors hover:bg-muted hover:text-text-primary"
                 aria-label="Tutup"
               >
                 <X size={18} />
@@ -238,7 +238,7 @@ export function Tabs<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="inline-flex rounded-lg bg-slate-50 p-1">
+    <div className="inline-flex rounded-lg bg-muted p-1">
       {tabs.map((t) => (
         <button
           key={t.value}
@@ -247,7 +247,7 @@ export function Tabs<T extends string>({
             "cursor-pointer rounded-md px-4 py-1.5 text-sm font-medium transition-colors duration-150",
             value === t.value
               ? "bg-primary-500 text-white"
-              : "text-text-primary hover:bg-white",
+              : "text-text-primary hover:bg-surface",
           )}
         >
           {t.label}

@@ -49,7 +49,7 @@ export default function CategoriesPage() {
           className={
             row.original.active
               ? "bg-success-soft text-success-strong"
-              : "bg-slate-100 text-text-muted"
+              : "bg-muted text-text-muted"
           }
         >
           {row.original.active ? "Aktif" : "Nonaktif"}
@@ -65,7 +65,7 @@ export default function CategoriesPage() {
         <div className="flex justify-end gap-1">
           <button
             onClick={() => setEditing(row.original)}
-            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-slate-50 hover:text-primary-500"
+            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-muted hover:text-primary-500"
             aria-label="Edit"
           >
             <Pencil size={16} />

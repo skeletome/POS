@@ -4,6 +4,7 @@ import { cn } from "@/lib/cn";
 import { usePosStore } from "@/lib/use-pos-store";
 import { POS_MASCOT_URL } from "@/lib/brand";
 import {
+  BadgePercent,
   BarChart3,
   LayoutDashboard,
   LogOut,
@@ -20,6 +21,8 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState, type ReactNode } from "react";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { SoundToggle } from "@/components/sound-toggle";
 
 interface NavItem {
   href: string;
@@ -42,6 +45,7 @@ const sections: { label: string; items: NavItem[] }[] = [
       { href: "/menu/categories", label: "Kategori", icon: <Store size={18} /> },
       { href: "/menu/options", label: "Product Options", icon: <SlidersHorizontal size={18} /> },
       { href: "/transactions", label: "Transaksi", icon: <ReceiptText size={18} /> },
+      { href: "/promo", label: "Promo & Diskon", icon: <BadgePercent size={18} /> },
       { href: "/reports", label: "Laporan", icon: <BarChart3 size={18} /> },
     ],
   },
@@ -70,7 +74,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   };
 
   return (
-    <div className="flex h-full flex-col bg-white">
+    <div className="flex h-full flex-col bg-surface">
       <div className="flex items-center gap-2.5 border-b border-border px-5 py-4">
         <img
           src={POS_MASCOT_URL}
@@ -101,7 +105,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
                       "cursor-pointer flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150",
                       active
                         ? "bg-primary-50 text-primary-500"
-                        : "text-text-secondary hover:bg-slate-50",
+                        : "text-text-secondary hover:bg-muted",
                     )}
                   >
                     <span className={cn(active ? "text-primary-500" : "text-text-muted")}>
@@ -127,11 +131,17 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           </div>
           <button
             onClick={handleLogout}
-            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-slate-50 hover:text-text-primary"
+            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-muted hover:text-text-primary"
             aria-label="Logout"
           >
             <LogOut size={16} />
           </button>
+        </div>
+        <div className="border-t border-border px-2 pt-2">
+          <ThemeToggle />
+          <div className="mt-1">
+            <SoundToggle />
+          </div>
         </div>
       </div>
     </div>
@@ -180,7 +190,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         <header className="flex h-16 shrink-0 items-center gap-3 border-b border-border bg-surface px-4 print:hidden md:px-6">
           <button
             onClick={() => setMobileOpen(true)}
-            className="cursor-pointer rounded-lg p-2 text-text-muted hover:bg-slate-50 lg:hidden"
+            className="cursor-pointer rounded-lg p-2 text-text-muted hover:bg-muted lg:hidden"
             aria-label="Buka menu"
           >
             <Menu size={20} />
@@ -207,7 +217,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   window.location.href = "/login";
                 }
               }}
-            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-slate-50 hover:text-text-primary"
+            className="cursor-pointer rounded-lg p-2 text-text-muted transition-colors hover:bg-muted hover:text-text-primary"
             aria-label="Logout"
           >
             <LogOut size={18} />

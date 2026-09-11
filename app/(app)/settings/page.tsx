@@ -2,15 +2,21 @@
 
 import {
   Banknote,
+  Check,
   CreditCard,
+  Monitor,
+  Moon,
+  Palette,
   Percent,
   Plus,
   QrCode,
   Settings as SettingsIcon,
   Store,
+  Sun,
   Trash2,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useTheme } from "next-themes";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { BankLogo } from "@/components/bank-logo";
@@ -38,7 +44,7 @@ import { bankCreateSchema, type BankInput } from "@/lib/schemas/bank";
 import type { Bank } from "@/lib/types";
 import type { ColumnDef } from "@tanstack/react-table";
 
-type SettingsTab = "store" | "tax" | "payment" | "bank" | "qris";
+type SettingsTab = "store" | "tax" | "payment" | "bank" | "qris" | "appearance";
 
 const tabs: { value: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { value: "store", label: "Toko", icon: <Store size={16} /> },
@@ -46,6 +52,7 @@ const tabs: { value: SettingsTab; label: string; icon: React.ReactNode }[] = [
   { value: "payment", label: "Pembayaran", icon: <Banknote size={16} /> },
   { value: "bank", label: "Bank", icon: <CreditCard size={16} /> },
   { value: "qris", label: "QRIS", icon: <QrCode size={16} /> },
+  { value: "appearance", label: "Tampilan", icon: <Palette size={16} /> },
 ];
 
 export default function SettingsPage() {
@@ -96,6 +103,7 @@ export default function SettingsPage() {
       {tab === "payment" ? <PaymentSettingsForm /> : null}
       {tab === "bank" ? <BankSettingsForm /> : null}
       {tab === "qris" ? <QrisSettingsForm /> : null}
+      {tab === "appearance" ? <AppearanceSettingsForm /> : null}
       </>}
     </div>
   );
@@ -369,7 +377,7 @@ function BankSettingsForm() {
               className={
                 row.original.active
                   ? "bg-success-soft text-success-strong"
-                  : "bg-slate-100 text-text-muted"
+                  : "bg-muted text-text-muted"
               }
             >
               {row.original.active ? "Aktif" : "Nonaktif"}
@@ -496,7 +504,7 @@ function LogoUploadButton({
           e.target.value = "";
         }}
       />
-      <span className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-border bg-white px-2.5 text-xs font-medium text-text-primary hover:bg-surface-secondary">
+      <span className="inline-flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-border bg-surface px-2.5 text-xs font-medium text-text-primary hover:bg-surface-secondary">
         <Plus size={13} />
         {label}
       </span>
@@ -587,13 +595,67 @@ function QrisSettingsForm() {
                   e.target.value = "";
                 }}
               />
-              <span className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-border bg-white px-3 text-sm font-medium text-text-primary hover:bg-surface-secondary">
+              <span className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-border bg-surface px-3 text-sm font-medium text-text-primary hover:bg-surface-secondary">
                 {uploading ? "Mengunggah…" : image ? "Ganti QRIS" : "Unggah QRIS"}
               </span>
             </label>
           </div>
         </div>
         {error ? <p className="text-xs font-medium text-error-strong">{error}</p> : null}
+      </div>
+    </Card>
+  );
+}
+
+const themeOptions: { value: "light" | "dark" | "system"; label: string; description: string; icon: React.ReactNode }[] = [
+  { value: "light", label: "Light", description: "Selalu tampilan terang", icon: <Sun size={18} /> },
+  { value: "dark", label: "Dark", description: "Selalu tampilan gelap", icon: <Moon size={18} /> },
+  { value: "system", label: "System", description: "Mengikuti preferensi perangkat", icon: <Monitor size={18} /> },
+];
+
+function AppearanceSettingsForm() {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  const activeTheme = mounted ? theme : undefined;
+
+  return (
+    <Card className="max-w-xl">
+      <CardHeader
+        title="Tampilan"
+        description="Atur tema aplikasi. Perubahan tersimpan otomatis di perangkat."
+      />
+      <div className="grid gap-3">
+        {themeOptions.map((opt) => {
+          const active = activeTheme === opt.value;
+          return (
+            <button
+              key={opt.value}
+              onClick={() => setTheme(opt.value)}
+              className={cn(
+                "cursor-pointer flex items-center gap-3 rounded-lg border p-3 text-left transition-colors duration-150",
+                active
+                  ? "border-primary-500 bg-primary-50"
+                  : "border-border bg-surface hover:bg-surface-secondary",
+              )}
+            >
+              <span className={cn("shrink-0", active ? "text-primary-500" : "text-text-muted")}>
+                {opt.icon}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-sm font-medium text-text-primary">{opt.label}</span>
+                <span className="block text-xs text-text-muted">{opt.description}</span>
+              </span>
+              {active ? (
+                <span className="ml-auto shrink-0 text-primary-500">
+                  <Check size={16} />
+                </span>
+              ) : null}
+            </button>
+          );
+        })}
       </div>
     </Card>
   );

@@ -181,7 +181,7 @@ export default function LoginPage() {
       </div>
 
       {/* Kanan — background gradient + gambar hero */}
-      <div className="relative hidden overflow-hidden bg-gradient-to-b from-white to-primary-500 lg:block">
+      <div className="relative hidden overflow-hidden bg-gradient-to-b from-surface to-primary-500 lg:block">
         <div className="flex h-full w-full items-center justify-end">
           <motion.div
             initial={{ opacity: 0, x: 30 }}

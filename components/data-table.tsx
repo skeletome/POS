@@ -269,7 +269,7 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
         {manualPagination && fetching && !loading ? (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface/60">
             <Loader2 size={20} className="animate-spin text-primary-500" />
           </div>
         ) : null}

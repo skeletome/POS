@@ -72,6 +72,12 @@ Sebelum implementasi fitur:
 5. Type check via `npm run build` (tidak ada script lint)
 6. Bereskan error
 
+## Pencatatan Hasil (wajib)
+
+- Setelah SETIAP prompt/tugas selesai, catat ringkasan perubahan ke `docs/prompt-log.md`.
+- **Append-only:** hanya tambahkan entri baru di PALING BAWAH file. JANGAN pernah menghapus, mengedit, atau memadatkan entri lama.
+- Format entri & contoh: lihat skill `append-notes`.
+
 ## Do Not
 
 - Refactor file yang tidak terkait

@@ -41,6 +41,8 @@ export interface Transaction {
   orderType: OrderType;
   items: TransactionItem[];
   subtotal: number;
+  discountAmount: number;
+  voucherCode?: string | null;
   taxRate: number;
   taxAmount: number;
   total: number;

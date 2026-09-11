@@ -17,3 +17,5 @@ export type { StoreSettings, StoreSettingsInput } from "./store";
 export type { TaxSettings, TaxSettingsInput } from "./tax";
 export type { Bank, BankInput } from "./bank";
 export type { PaymentSettings, PaymentSettingsInput } from "./payment";
+export type { ProductDiscount, ProductDiscountInput } from "./discount";
+export type { Voucher, VoucherInput } from "./voucher";

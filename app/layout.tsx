@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ThemeProvider } from "next-themes";
 import { Inter, Geist } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
@@ -19,12 +20,20 @@ export default function RootLayout({
   return (
     <html
       lang="id"
+      suppressHydrationWarning
       data-scroll-behavior="smooth"
       className={cn("h-full", "antialiased", "font-sans", geist.variable)}
     >
       <body className="min-h-full flex flex-col">
-      <QueryProvider>{children}</QueryProvider>
-    </body>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <QueryProvider>{children}</QueryProvider>
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

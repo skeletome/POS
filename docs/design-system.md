@@ -325,9 +325,100 @@ my-project/ ├── AGENTS.md ├── PRD.md ├── DESIGN.md ├── a
 
 - MCP: tool/data eksternal yang boleh diakses AI. 
 
-Catatan: font Inter dipilih sebagai rekomendasi visual berdasarkan karakter screenshot; font asli tidak dapat dipastikan 100% hanya dari screenshot. 
+Catatan: font Inter dipilih sebagai rekomendasi visual berdasarkan karakter screenshot; font asli tidak dapat dipastikan 100% hanya dari screenshot.
 
 Design System — Productivity SaaS Dashboard 
 
 Page 6 
+
+## **23. Dark Mode** 
+
+Referensi palette: **Askk AI / Stellar UI** (dark theme). Implementasi menggunakan `next-themes` dengan class strategy (`attribute="class"`), default mengikuti sistem OS (`system`), dan toggle tersedia di **sidebar** serta **halaman Settings**.
+
+### **23.1 Color Tokens — Dark**
+
+|**Token**|**Hex**|**Penggunaan**|
+|---|---|---|
+|`--bg-base`|#111213|Background utama workspace|
+|`--bg-surface`|#1c1d1f|Card, sidebar, panel|
+|`--bg-elevated`|#242628|Hover state, input background|
+|`--bg-overlay`|#2a2c2f|Modal, dropdown|
+|`--border`|#2e3033|Border halus antar elemen|
+|`--border-strong`|#3a3d42|Border aktif / focused|
+
+|**Token (Text)**|**Hex**|**Penggunaan**|
+|---|---|---|
+|`--text-primary`|#e8eaed|Judul, teks utama|
+|`--text-secondary`|#9aa0a6|Subtitle, label, placeholder|
+|`--text-muted`|#5f6368|Teks tidak aktif, timestamp|
+|`--text-inverse`|#111213|Teks di atas tombol terang|
+
+|**Token (Accent)**|**Hex**|**Penggunaan**|
+|---|---|---|
+|`--accent-primary`|#3B82F6|Primary button, link aktif — konsisten dengan light mode|
+|`--accent-primary-hover`|#2563EB|Hover primary button|
+|`--accent-primary-subtle`|rgba(59, 130, 246, 0.12)|Background subtle accent|
+
+### **23.2 Semantic — Dark**
+
+|**Token**|**Hex**|
+|---|---|
+|Success|#34a853|
+|Warning|#fbbc04|
+|Error|#ea4335|
+|Info|#4285f4|
+
+### **23.3 Shadow — Dark**
+
+Gunakan shadow dengan opacity lebih tinggi di dark mode karena kontras lebih rendah.
+
+```css
+--shadow-sm:  0 1px 2px rgba(0,0,0,0.4);
+--shadow-md:  0 4px 12px rgba(0,0,0,0.5);
+--shadow-lg:  0 8px 24px rgba(0,0,0,0.6);
+--shadow-glow: 0 0 16px rgba(59,130,246,0.25);
+```
+
+### **23.4 Implementasi di POS App**
+
+Dark mode diaktifkan dengan class `.dark` pada `<html>`. Semua warna text/border/background yang **sudah token-based** (mis. `text-text-primary`, `bg-surface`, `border-border`) otomatis menyesuaikan karena token CSS variable di-override di blok `.dark`.
+
+```css
+:root {
+  --bg-base: #111213;
+  --bg-surface: #1c1d1f;
+  --text-primary: #e8eaed;
+  --accent-primary: #3b82f6;
+  /* dst. */
+}
+
+.dark {
+  /* override token di sini */
+}
+```
+
+### **23.5 Aturan Dark Mode**
+
+**✅ Do**
+- Gunakan `--bg-surface` untuk sidebar dan card agar berbeda dari `--bg-base` (background utama).
+- Berikan border `1px solid --border` pada elemen yang perlu separasi visual — di dark mode border lebih penting daripada shadow.
+- Text-secondary untuk label/meta; text-primary untuk judul dan teks utama.
+- Jaga konsistensi accent `--accent-primary` (#3B82F6) untuk elemen aktif/primary — sama di light dan dark mode.
+
+**❌ Don't**
+- Jangan gunakan `#000000` pure black sebagai background — terlalu harsh untuk dashboard.
+- Jangan gunakan warna terang light theme yang tidak di-token (mis. `bg-white`, `text-gray-800`) di dalam komponen — ganti dengan token `bg-surface`, `text-text-primary`, dll.
+- Jangan gunakan shadow kuat di semua elemen — hanya modal dan dropdown.
+- Jangan ubah hue accent saat dark mode (mis. biru → ungu) — gunakan `--color-primary` yang sudah konsisten (#3B82F6).
+
+### **23.6 Tailwind Mapping — Dark**
+
+- Background: `bg-base` / `bg-surface` / `bg-elevated` / `bg-overlay` (di-expose sebagai `--color-*`).
+- Text: `text-text-primary` / `text-text-secondary` / `text-text-muted`.
+- Border: `border-border` / `border-border-strong`.
+- Accent: `bg-primary` (konsisten #3B82F6 di light & dark).
+
+Design System — Productivity SaaS Dashboard 
+
+Page 7
 

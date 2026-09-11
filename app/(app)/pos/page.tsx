@@ -56,6 +56,17 @@ export default function PosPage() {
     };
   }, [printTrx]);
 
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (usePosStore.getState().cart.length > 0) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, []);
+
   return (
     <div>
       <div className="grid grid-cols-1 gap-4 lg:h-[calc(100vh-8.5rem)] lg:min-h-[560px] lg:grid-cols-[1fr_400px]">

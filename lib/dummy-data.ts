@@ -341,6 +341,8 @@ function makeTransaction(
     orderType,
     items: itemLines,
     subtotal,
+    discountAmount: 0,
+    voucherCode: null,
     taxRate,
     taxAmount,
     total,

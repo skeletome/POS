@@ -14,10 +14,12 @@ import type {
   Category,
   OrderType,
   Product,
+  ProductDiscount,
   Role,
   StoreSettings,
   TaxSettings,
   Transaction,
+  Voucher,
 } from "./types/index";
 import type { PaymentSettings } from "./schemas/payment";
 
@@ -38,6 +40,8 @@ export interface PosState {
   storeSettings: StoreSettings;
   taxSettings: TaxSettings;
   paymentSettings: PaymentSettings;
+  discounts: ProductDiscount[];
+  vouchers: Voucher[];
 
   cart: CartItem[];
   orderType: OrderType;
@@ -51,6 +55,8 @@ export interface PosState {
     storeSettings?: StoreSettings;
     taxSettings?: TaxSettings;
     paymentSettings?: PaymentSettings;
+    discounts?: ProductDiscount[];
+    vouchers?: Voucher[];
   }) => void;
 
   dataLoaded: boolean;
@@ -58,6 +64,8 @@ export interface PosState {
   setStoreSettings: (s: StoreSettings) => void;
   setTaxSettings: (t: TaxSettings) => void;
   setPaymentSettings: (p: PaymentSettings) => void;
+  setDiscounts: (d: ProductDiscount[]) => void;
+  setVouchers: (v: Voucher[]) => void;
 
   setOrderType: (t: OrderType) => void;
   addToCart: (item: CartItem) => void;
@@ -83,6 +91,8 @@ export const usePosStore = create<PosState>((set, get) => ({
   storeSettings: initialStoreSettings,
   taxSettings: initialTaxSettings,
   paymentSettings: { cashEnabled: true, bankEnabled: true, qrisEnabled: true },
+  discounts: [],
+  vouchers: [],
 
   cart: [],
   orderType: "DINE_IN",
@@ -98,12 +108,16 @@ export const usePosStore = create<PosState>((set, get) => ({
       ...(d.storeSettings ? { storeSettings: d.storeSettings } : {}),
       ...(d.taxSettings ? { taxSettings: d.taxSettings } : {}),
       ...(d.paymentSettings ? { paymentSettings: d.paymentSettings } : {}),
+      ...(d.discounts ? { discounts: d.discounts } : {}),
+      ...(d.vouchers ? { vouchers: d.vouchers } : {}),
       dataLoaded: true,
     })),
 
   setStoreSettings: (storeSettings) => set({ storeSettings }),
   setTaxSettings: (taxSettings) => set({ taxSettings }),
   setPaymentSettings: (paymentSettings) => set({ paymentSettings }),
+  setDiscounts: (discounts) => set({ discounts }),
+  setVouchers: (vouchers) => set({ vouchers }),
 
   setOrderType: (orderType) => set({ orderType }),
   addToCart: (item) => set((s) => ({ cart: [...s.cart, item] })),

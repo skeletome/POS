@@ -5,7 +5,7 @@ export default function PDFPreview({ url }: { url: string }) {
     <iframe
       src={url}
       title="Pratinjau Struk PDF"
-      className="h-[70vh] w-full rounded-lg border border-border bg-slate-100"
+      className="h-[70vh] w-full rounded-lg border border-border bg-muted"
     />
   );
 }

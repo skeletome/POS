@@ -7,6 +7,8 @@ export const queryKeys = {
   categories: ["categories"] as const,
   options: ["options"] as const,
   banks: ["banks"] as const,
+  discounts: ["discounts"] as const,
+  vouchers: ["vouchers"] as const,
   settings: ["settings"] as const,
   cashiers: ["cashiers"] as const,
   transactions: {

@@ -169,6 +169,12 @@ export default function TransactionDetailPage() {
           <Card>
             <h3 className="mb-3 text-base font-semibold text-text-primary">Ringkasan</h3>
             <Row label="Subtotal" value={formatRupiah(transaction.subtotal)} />
+            {transaction.discountAmount > 0 ? (
+              <Row
+                label={transaction.voucherCode ? `Diskon (${transaction.voucherCode})` : "Diskon Produk"}
+                value={`-${formatRupiah(transaction.discountAmount)}`}
+              />
+            ) : null}
             <Row
               label="Pajak"
               value={`${formatRupiah(transaction.taxAmount)} (${Math.round(transaction.taxRate * 100)}%)`}

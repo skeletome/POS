@@ -59,7 +59,7 @@ export default function CashiersPage() {
           className={
             row.original.active
               ? "bg-success-soft text-success-strong"
-              : "bg-slate-100 text-text-muted"
+              : "bg-muted text-text-muted"
           }
         >
           {row.original.active ? "Aktif" : "Nonaktif"}

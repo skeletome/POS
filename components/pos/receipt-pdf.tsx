@@ -87,6 +87,16 @@ export function ReceiptPDF({
           <Text style={styles.subtotalText}>Subtotal</Text>
           <Text style={styles.rowValue}>{formatRupiah(transaction.subtotal)}</Text>
         </View>
+        {transaction.discountAmount > 0 ? (
+          <View style={styles.row}>
+            <Text style={styles.subtotalText}>
+              {transaction.voucherCode
+                ? `Diskon (${transaction.voucherCode})`
+                : "Diskon Produk"}
+            </Text>
+            <Text style={styles.rowValue}>-{formatRupiah(transaction.discountAmount)}</Text>
+          </View>
+        ) : null}
         <View style={styles.row}>
           <Text style={styles.subtotalText}>Pajak</Text>
           <Text style={styles.rowValue}>{formatRupiah(transaction.taxAmount)}</Text>

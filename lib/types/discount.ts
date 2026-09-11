@@ -1,0 +1,1 @@
+export type { ProductDiscount, ProductDiscountInput } from "@/lib/schemas/discount";

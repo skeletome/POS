@@ -657,7 +657,46 @@ Transaction completed
 
 ---
 
-# 21. Transaction Requirements
+# 21. Promosi Diskon Produk
+
+Owner dapat membuat kampanye diskon produk ("hari spesial") yang diterapkan secara otomatis saat kasir menambahkan produk ke keranjang.
+
+**Aturan:**
+
+| ID | Requirement |
+|---|---|
+| PROMO-001 | Promo memiliki nama, jenis diskon (Persen atau Nominal), nilai diskon, periode berlaku (awal & akhir, opsional), dan status aktif. |
+| PROMO-002 | Owner memilih satu atau lebih produk yang ikut promo; hanya produk aktif yang dapat dipilih. |
+| PROMO-003 | Diskon dihitung per line item: Persen `round(line × nilai/100)`; Nominal `min(nilai, line)`. Diterapkan sebelum voucher dan sebelum pajak. |
+| PROMO-004 | Jika beberapa promo aktif tumpang tindih pada produk yang sama, diskon terbesar yang berlaku. |
+| PROMO-005 | Promo yang dinonaktifkan atau di luar periode tidak diterapkan pada transaksi baru. |
+| PROMO-006 | Harga diskon ditampilkan pada product card POS (harga coret + harga diskon + badge DISKON). |
+| PROMO-007 | Hanya Owner yang dapat membuat, mengubah, mengaktifkan/menonaktifkan, dan menghapus promo. |
+| PROMO-008 | Penghitungan diskon diverifikasi ulang di server (database) — klien tidak dipercaya dalam penentuan harga final. |
+
+---
+
+# 22. Voucher
+
+Voucher adalah kode diskon manual yang dibuat Owner dan dimasukkan kasir saat checkout untuk memberi diskon ke pelanggan. Voucher dapat digabung (stack) dengan diskon produk.
+
+**Aturan:**
+
+| ID | Requirement |
+|---|---|
+| VOUCHER-001 | Voucher memiliki kode unik (per store, di-uppercase), jenis diskon (Persen/Nominal), nilai diskon, status aktif, dan periode berlaku opsional. |
+| VOUCHER-002 | Opsional: syarat minimum subtotal (sebelum diskon), batas diskon maksimum (untuk Persen), dan kuota pemakaian `usage_limit`. |
+| VOUCHER-003 | Voucher tidak valid jika nonaktif, di luar periode, kuota habis (`used_count >= usage_limit`), atau subtotal belum memenuhi minimum. |
+| VOUCHER-004 | Persen dihitung dari subtotal (sebelum pajak) lalu di-cap oleh `max_discount`; Nominal = `min(nilai, subtotal)`. |
+| VOUCHER-005 | Diskon voucher ditambahkan ke diskon produk; pajak dihitung dari `(subtotal − total diskon)`. |
+| VOUCHER-006 | `used_count` dinaikkan secara atomik dalam transaksi DB yang sama saat transaksi disimpan — mencegah pemakaian melebihi kuota walau checkout bersamaan. |
+| VOUCHER-007 | Kasir memasukkan kode voucher di panel checkout; validitas ditampilkan live (pesan error jika tidak ditemukan / belum berlaku / kuota habis / belum memenuhi minimum). |
+| VOUCHER-008 | Kode voucher (snapshot) dan total diskon disimpan pada transaction record. |
+| VOUCHER-009 | Hanya Owner yang dapat membuat, mengubah, mengaktifkan/menonaktifkan, dan menghapus voucher; kasir hanya dapat memakainya. |
+
+---
+
+# 23. Transaction Requirements
 
 Transaction minimal memiliki:
 
@@ -686,7 +725,7 @@ Created At
 
 ---
 
-# 22. Transaction Snapshot
+# 24. Transaction Snapshot
 
 | ID | Requirement |
 |---|---|
@@ -697,7 +736,7 @@ Created At
 
 ---
 
-# 23. Transaction History
+# 25. Transaction History
 
 | ID | Requirement |
 |---|---|
@@ -708,7 +747,7 @@ Created At
 
 ---
 
-# 24. Reports
+# 26. Reports
 
 | ID | Requirement |
 |---|---|
@@ -719,7 +758,7 @@ Created At
 
 ---
 
-# 25. Menu Management
+# 27. Menu Management
 
 | ID | Requirement |
 |---|---|
@@ -730,7 +769,7 @@ Created At
 
 ---
 
-# 26. Store Settings
+# 28. Store Settings
 
 Owner dapat mengatur:
 
@@ -744,7 +783,7 @@ Owner dapat mengatur:
 
 ---
 
-# 27. Payment Method Configuration
+# 29. Payment Method Configuration
 
 Owner dapat mengaktifkan/menonaktifkan payment method.
 
@@ -758,7 +797,7 @@ QRIS          [OFF]
 
 ---
 
-# 28. User / Cashier Management
+# 30. User / Cashier Management
 
 Owner dapat:
 - Create cashier.
@@ -770,7 +809,7 @@ Owner dapat:
 
 ---
 
-# 29. Authorization Rules
+# 31. Authorization Rules
 
 ```
 OWNER
@@ -789,7 +828,7 @@ CASHIER
 
 ---
 
-# 30. Data Integrity Requirements
+# 32. Data Integrity Requirements
 
 | Requirement | Keterangan |
 |---|---|
@@ -800,7 +839,7 @@ CASHIER
 
 ---
 
-# 31. Transaction Calculation Rules
+# 33. Transaction Calculation Rules
 
 ```
 item_unit_price = product_price + selected_option_charges
@@ -818,7 +857,7 @@ total = subtotal + tax
 
 ---
 
-# 32. POS Transaction Flow
+# 34. POS Transaction Flow
 
 ```
 Login → Open POS → Search/Filter → Select Product
@@ -831,7 +870,7 @@ Login → Open POS → Search/Filter → Select Product
 
 ---
 
-# 33. Cash Transaction Flow
+# 35. Cash Transaction Flow
 
 ```
 Cart → Checkout → Cash → Enter Amount Paid
@@ -841,7 +880,7 @@ Cart → Checkout → Cash → Enter Amount Paid
 
 ---
 
-# 34. Bank Transaction Flow
+# 36. Bank Transaction Flow
 
 ```
 Cart → Checkout → Bank Transfer → Select Bank
@@ -851,7 +890,7 @@ Cart → Checkout → Bank Transfer → Select Bank
 
 ---
 
-# 35. QRIS Transaction Flow
+# 37. QRIS Transaction Flow
 
 ```
 Cart → Checkout → QRIS → Display Store QR
@@ -861,7 +900,7 @@ Cart → Checkout → QRIS → Display Store QR
 
 ---
 
-# 36. Error Handling
+# 38. Error Handling
 
 | Kategori | Error |
 |---|---|
@@ -873,7 +912,7 @@ Cart → Checkout → QRIS → Display Store QR
 
 ---
 
-# 37. Duplicate Transaction Protection
+# 39. Duplicate Transaction Protection
 
 Sistem harus mencegah pembuatan transaksi duplicate menggunakan:
 - Disabled submit state.
@@ -884,7 +923,7 @@ Sistem harus mencegah pembuatan transaksi duplicate menggunakan:
 
 ---
 
-# 38. Loading & UX Requirements
+# 40. Loading & UX Requirements
 
 POS harus memberikan feedback ketika:
 - Product sedang dimuat.
@@ -895,7 +934,7 @@ POS harus memberikan feedback ketika:
 
 ---
 
-# 39. Responsive Requirements
+# 41. Responsive Requirements
 
 | Priority | Platform |
 |---|---|
@@ -915,7 +954,7 @@ Product area ↓ Cart/Checkout
 
 ---
 
-# 40. Performance Requirements
+# 42. Performance Requirements
 
 Operasi berikut harus terasa responsive:
 - Search, Category filtering, Add to cart, Quantity update, Open customization, Checkout.
@@ -924,7 +963,7 @@ Operasi berikut harus terasa responsive:
 
 ---
 
-# 41. Security Requirements
+# 43. Security Requirements
 
 Sistem harus:
 - Menggunakan authentication dan authorization.
@@ -937,7 +976,7 @@ Sistem harus:
 
 ---
 
-# 42. Auditability
+# 44. Auditability
 
 Transaksi harus menyimpan minimal:
 
@@ -951,7 +990,7 @@ payment_method
 
 ---
 
-# 43. Acceptance Criteria — Authentication
+# 45. Acceptance Criteria — Authentication
 
 | ID | Given | When | Then |
 |---|---|---|---|
@@ -961,7 +1000,7 @@ payment_method
 
 ---
 
-# 44. Acceptance Criteria — Product
+# 46. Acceptance Criteria — Product
 
 | ID | Given | When | Then |
 |---|---|---|---|
@@ -971,7 +1010,7 @@ payment_method
 
 ---
 
-# 45. Acceptance Criteria — Options
+# 47. Acceptance Criteria — Options
 
 | ID | Given | When | Then |
 |---|---|---|---|
@@ -981,17 +1020,21 @@ payment_method
 
 ---
 
-# 46. Acceptance Criteria — Checkout
+# 48. Acceptance Criteria — Checkout
 
 | ID | Given | When | Then |
 |---|---|---|---|
-| AC-CHECKOUT-01 | Cart memiliki item | Checkout dibuka | Subtotal, tax, dan total ditampilkan. |
+| AC-CHECKOUT-01 | Cart memiliki item | Checkout dibuka | Subtotal, diskon, tax, dan total ditampilkan. |
 | AC-CHECKOUT-02 | Customer membayar lebih dari total | Cashier memasukkan nominal | Change dihitung otomatis. |
 | AC-CHECKOUT-03 | Customer membayar kurang dari total | Cashier mencoba menyelesaikan transaksi | Transaksi ditolak. |
+| AC-CHECKOUT-04 | Item di cart termasuk produk promo aktif | Checkout dibuka | Diskon produk terbesar tampil per item dan dikurangkan dari subtotal. |
+| AC-CHECKOUT-05 | Ada voucher aktif yang memenuhi syarat | Cashier memasukkan kode voucher | Validasi berhasil, diskon voucher tampil, dan total menyesuaikan. |
+| AC-CHECKOUT-06 | Kode voucher tidak dikenal / nonaktif / kuota habis / belum memenuhi minimum | Cashier memasukkan kode | Pesan error validasi ditampilkan dan diskon tidak diterapkan. |
+| AC-CHECKOUT-07 | Pajak aktif dan ada diskon | Checkout diselesaikan | Pajak dihitung dari subtotal setelah diskon. |
 
 ---
 
-# 47. Acceptance Criteria — Payment
+# 49. Acceptance Criteria — Payment
 
 | ID | Requirement |
 |---|---|
@@ -1002,7 +1045,7 @@ payment_method
 
 ---
 
-# 48. Acceptance Criteria — Snapshot
+# 50. Acceptance Criteria — Snapshot
 
 | ID | Given | When | Then |
 |---|---|---|---|
@@ -1013,7 +1056,7 @@ payment_method
 
 ---
 
-# 49. Acceptance Criteria — Transaction History
+# 51. Acceptance Criteria — Transaction History
 
 | ID | Requirement |
 |---|---|
@@ -1023,7 +1066,7 @@ payment_method
 
 ---
 
-# 50. Acceptance Criteria — Reports
+# 52. Acceptance Criteria — Reports
 
 | ID | Requirement |
 |---|---|
@@ -1034,7 +1077,7 @@ payment_method
 
 ---
 
-# 51. Definition of Done — MVP
+# 53. Definition of Done — MVP
 
 ### Authentication
 - [ ] Login bekerja.
@@ -1056,6 +1099,14 @@ payment_method
 - [ ] Cart bekerja.
 - [ ] Quantity bekerja.
 - [ ] Checkout bekerja.
+- [ ] Harga diskon + badge tampil di product card.
+- [ ] Kode voucher diverifikasi di checkout.
+
+### Promo & Voucher
+- [ ] Owner dapat CRUD promo diskon produk.
+- [ ] Owner dapat CRUD voucher (termasuk syarat & kuota).
+- [ ] Diskon produk & voucher diterapkan di checkout dan disimpan transaksi.
+- [ ] Kuota voucher ditegakkan server-side secara atomik.
 
 ### Payment
 - [ ] Cash bekerja.
@@ -1097,7 +1148,7 @@ payment_method
 
 ---
 
-# 52. MVP User Journey
+# 54. MVP User Journey
 
 ## Owner Journey
 
@@ -1107,6 +1158,7 @@ Register/Login → Create/Access Store → Configure Store
 → Configure Bank → Configure QRIS
 → Create Categories → Create Products
 → Configure Product Options → Create Cashier
+→ Create Promotions/Vouchers
 → Cashier Starts Selling
 → Owner Monitors Dashboard → Owner Reviews Reports
 ```
@@ -1116,18 +1168,17 @@ Register/Login → Create/Access Store → Configure Store
 ```
 Login → Open POS → Search Product → Select Product
 → Customize → Add to Cart → Select Dine-in/Takeaway
-→ Review Cart → Checkout → Select Payment
+→ Review Cart → Apply Voucher → Checkout → Select Payment
 → Confirm Payment → Transaction Completed
 ```
 
 ---
 
-# 53. Future Roadmap
+# 55. Future Roadmap
 
 ## V2
 - Inventory, Barcode, Receipt printer.
-- Table management, Discount, Promotion.
-- Customer management.
+- ~~Table management~~ (belum), ~~Discount, Promotion~~ **✓ Implemented** (lihat #21–#22), Customer management.
 
 ## V3
 - Multi-store, Supplier management, Purchasing.
@@ -1139,7 +1190,7 @@ Login → Open POS → Search Product → Select Product
 
 ---
 
-# 54. Product Principles
+# 56. Product Principles
 
 ### 1. Transaction First
 Historical transaction adalah data yang harus dipertahankan secara akurat.
@@ -1164,7 +1215,7 @@ Arsitektur Store dan Membership harus memungkinkan pengembangan di masa depan ta
 
 ---
 
-# 55. MVP Scope Summary
+# 57. MVP Scope Summary
 
 ```
 POS KASIR MVP
@@ -1221,7 +1272,7 @@ POS KASIR MVP
 
 ---
 
-# 56. Final MVP Boundary
+# 58. Final MVP Boundary
 
 MVP POS Kasir bertujuan menyelesaikan satu core workflow:
 

@@ -44,6 +44,7 @@ export const transactionCreateSchema = z.object({
   payment: paymentInfoSchema,
   cashierName: z.string().default("Kasir"),
   items: z.array(transactionItemInputSchema).min(1, "Keranjang kosong"),
+  voucherCode: z.string().trim().optional(),
 });
 
 export const transactionStatusUpdateSchema = z.object({

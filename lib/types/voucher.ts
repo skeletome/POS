@@ -1,0 +1,1 @@
+export type { Voucher, VoucherInput } from "@/lib/schemas/voucher";

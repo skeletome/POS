@@ -101,7 +101,7 @@ export function DashboardSkeleton() {
           <Skeleton className="h-6 w-48" />
           <Skeleton className="h-4 w-36" />
         </div>
-        <div className="flex gap-1 rounded-lg bg-slate-50 p-1">
+        <div className="flex gap-1 rounded-lg bg-muted p-1">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-8 w-24 rounded-md" />
           ))}
@@ -130,12 +130,12 @@ export function ReportsSkeleton() {
         <Skeleton className="h-4 w-64" />
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-lg bg-slate-50 p-1">
+        <div className="flex gap-1 rounded-lg bg-muted p-1">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-8 w-20 rounded-md" />
           ))}
         </div>
-        <div className="flex gap-1 rounded-lg bg-slate-50 p-1">
+        <div className="flex gap-1 rounded-lg bg-muted p-1">
           {Array.from({ length: 4 }).map((_, i) => (
             <Skeleton key={i} className="h-8 w-24 rounded-md" />
           ))}

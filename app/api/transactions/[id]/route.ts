@@ -65,6 +65,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       orderType: txn.order_type as Transaction["orderType"],
       items,
       subtotal: txn.subtotal,
+      discountAmount: txn.discount_amount ?? 0,
+      voucherCode: txn.voucher_code ?? null,
       taxRate: Number(txn.tax_rate),
       taxAmount: txn.tax_amount,
       total: txn.total,

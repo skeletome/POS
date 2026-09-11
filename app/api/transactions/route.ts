@@ -130,7 +130,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { orderType, payment, items } = parsed.data;
+    const { orderType, payment, items, voucherCode } = parsed.data;
 
     // SECURITY: Do NOT compute totals server-side from client values.
     // The RPC create_transaction looks up canonical prices from the products table
@@ -164,10 +164,15 @@ export async function POST(request: Request) {
       p_payment_method: payment.method,
       p_payment_info,
       p_items,
+      p_voucher_code: voucherCode ? voucherCode.trim().toUpperCase() : null,
     });
 
     if (error) {
-      return jsonError(error.message ?? "Gagal menyimpan transaksi.", 500);
+      const msg = error.message ?? "Gagal menyimpan transaksi.";
+      if (/voucher|minimum/i.test(msg)) {
+        return jsonError(msg, 422, "INVALID_VOUCHER");
+      }
+      return jsonError(msg, 500);
     }
 
     // 3. After RPC returns, validate payment against the DB-computed total.
@@ -191,6 +196,8 @@ interface TrxRow {
   cashier_name: string;
   order_type: string;
   subtotal: number;
+  discount_amount: number;
+  voucher_code: string | null;
   tax_rate: number | string;
   tax_amount: number;
   total: number;
@@ -232,6 +239,8 @@ function toFrontendTransaction(t: TrxRow, items: ItemRow[]): Transaction {
     orderType: t.order_type as Transaction["orderType"],
     items: transactionItems,
     subtotal: t.subtotal,
+    discountAmount: t.discount_amount ?? 0,
+    voucherCode: t.voucher_code ?? null,
     taxRate: Number(t.tax_rate),
     taxAmount: t.tax_amount,
     total: t.total,

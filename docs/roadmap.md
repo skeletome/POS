@@ -77,22 +77,20 @@ Setiap item dilengkapi acceptance criteria yang dapat diverifikasi secara teknis
 4. Cancel seluruh transaksi tetap satu alur (status `CANCELLED`), kini disertai alasan wajib + pelaku.
 5. Laporan revenue tidak menghitung ulang transaksi lama; nilai bersih diperoleh dari koreksi refund (kolom `refunded` di laporan).
 
-## 3.3 Diskon & Voucher
+## 3.3 Diskon & Voucher — ✅ **SUDAH DIIMPLEMENTASI** (11 Sep 2026)
 
-**Deskripsi:** Diskon per item dan per transaksi (persen & nominal), serta voucher kode (sekali pakai, kadaluarsa, minimum pembelian), ditampilkan transparan di ringkasan dan struk.
+**Deskripsi:** Diskon per item dan per transaksi (persen & nominal), serta voucher kode (kadaluarsa, minimum pembelian, kuota), ditampilkan transparan di ringkasan dan struk.
 
-**Dampak skema/data:**
-- Tabel `discounts` / `vouchers` (kode, tipe `PERCENT / FIXED`, nilai, min subtotal, max diskon, masa berlaku, kuota, aktif).
-- `transactions`: tambah kolom `discount_amount`, `voucher_id`.
+**Status implementasi:**
+- Tabel `product_discounts` + `product_discount_items` (diskon produk, banyak-ke-banyak) dan `vouchers` (kode unik per store, tipe `PERCENT / FIXED`, nilai, min subtotal, maks diskon, masa berlaku, kuota, aktif).
+- `transactions`: kolom `discount_amount`, `voucher_id`, `voucher_code` (snapshot).
+- Diskon dihitung ulang di server (`create_transaction`, migration V7): diskon produk terbesar per item jika tumpang tindih; voucher divalidasi & `used_count` dinaikkan atomik.
+- UI: halaman `/promo` (OWNER) 2 tab — Diskon Produk & Voucher; harga diskon + badge di POS; input kode voucher di checkout.
+- Detail: PRD §21 (Promosi Diskon Produk) dan §22 (Voucher).
 
-**Role & permission:** Hanya OWNER yang membuat/mengedit voucher & aturan diskon. Kasir hanya menerapkan pada transaksi.
-
-**Acceptance criteria:**
-1. Diskon menurunkan subtotal sebelum pajak; struk menampilkan rincian diskon.
-2. Voucher kadaluarsa / melebihi kuota / di bawah min subtotal ditolak dengan pesan jelas.
-3. Voucher sekali pakai tidak dapat dipakai dua kali.
-4. Laporan menampilkan total diskon & voucher terpakai per periode.
-5. Edit harga produk oleh kasir tetap dilarang; diskon tidak dapat melewati batas (mis. diskon negatif / melebihi total).
+**Sisa (penyempurnaan di masa depan):**
+- Laporan menampilkan total diskon & voucher terpakai per periode.
+- Voucher "sekali pakai" tersandarkan pada `usage_limit` per kode (belum per keunikan pelanggan).
 
 ## 3.4 Shift Kasir & Laci Uang (X/Z Report)
 

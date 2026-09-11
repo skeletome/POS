@@ -15,15 +15,17 @@ import {
   ShoppingCart,
   Trash2,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { BankLogo } from "@/components/bank-logo";
-import { Button, EmptyState, Modal } from "@/components/ui";
+import { Button, EmptyState, Input, Modal } from "@/components/ui";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/cn";
 import { formatRupiah } from "@/lib/format";
 import { paymentMethodLabels } from "@/lib/dummy-data";
+import { playSuccessSound, unlockAudio } from "@/lib/sound";
+import { computePricing, validateVoucher } from "@/lib/pricing";
 import { usePosStore, type PaymentSettings } from "@/lib/use-pos-store";
-import type { Bank, PaymentInfo, PaymentMethod, Transaction } from "@/lib/types";
+import type { Bank, PaymentInfo, PaymentMethod, Transaction, Voucher } from "@/lib/types";
 
 export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) => void }) {
   const cart = usePosStore((s) => s.cart);
@@ -34,6 +36,8 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
   const taxSettings = usePosStore((s) => s.taxSettings);
   const paymentSettings = usePosStore((s) => s.paymentSettings);
   const banks = usePosStore((s) => s.banks);
+  const discounts = usePosStore((s) => s.discounts);
+  const vouchers = usePosStore((s) => s.vouchers);
   const user = usePosStore((s) => s.user);
   const qrisName = usePosStore((s) => s.storeSettings.storeName);
 
@@ -46,6 +50,8 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
   const [bankModalOpen, setBankModalOpen] = useState(false);
   const [pendingBankId, setPendingBankId] = useState("");
   const [processing, setProcessing] = useState(false);
+  const [voucherInput, setVoucherInput] = useState("");
+  const [voucherError, setVoucherError] = useState<string | null>(null);
   const [success, setSuccess] = useState<{
     id: string;
     transaction: Transaction;
@@ -57,11 +63,49 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
       : taxSettings.takeawayRate
     : 0;
 
-  const { subtotal, taxAmount, total } = useMemo(() => {
-    const st = cart.reduce((acc, c) => acc + c.unitPrice * c.quantity, 0);
-    const tax = Math.round(st * (taxRate ?? 0));
-    return { subtotal: st, taxAmount: tax, total: st + tax };
-  }, [cart, taxRate]);
+  const pricingItems = cart.map((c) => ({
+    id: c.id,
+    productId: c.productId,
+    unitPrice: c.unitPrice,
+    quantity: c.quantity,
+  }));
+
+  const baseSubtotal = useMemo(
+    () => cart.reduce((acc, c) => acc + c.unitPrice * c.quantity, 0),
+    [cart],
+  );
+
+  const appliedVoucher = useMemo(() => {
+    const code = voucherInput.trim().toUpperCase();
+    if (!code) return null;
+    return vouchers.find((v) => v.code === code) ?? null;
+  }, [vouchers, voucherInput]);
+
+  useEffect(() => {
+    const code = voucherInput.trim().toUpperCase();
+    if (!code) {
+      setVoucherError(null);
+      return;
+    }
+    const v = vouchers.find((x) => x.code === code);
+    if (!v) {
+      setVoucherError("Kode voucher tidak ditemukan");
+      return;
+    }
+    setVoucherError(validateVoucher(v, baseSubtotal));
+  }, [vouchers, voucherInput, baseSubtotal]);
+
+  const activeVoucher = useMemo(
+    () => (appliedVoucher && validateVoucher(appliedVoucher, baseSubtotal) === null ? appliedVoucher : null),
+    [appliedVoucher, baseSubtotal],
+  );
+
+  const pricing = useMemo(
+    () => computePricing(pricingItems, discounts, activeVoucher, taxRate ?? 0),
+    [pricingItems, discounts, activeVoucher, taxRate],
+  );
+
+  const { baseSubtotal: subtotal, taxAmount, total } = pricing;
 
   const amountPaid = Number(paid) || 0;
   const change = amountPaid - total;
@@ -88,6 +132,7 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
       );
       return;
     }
+    unlockAudio();
     setError("");
     setProcessing(true);
     try {
@@ -106,6 +151,7 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
           orderType,
           payment,
           cashierName: user?.name ?? "Kasir",
+          ...(activeVoucher ? { voucherCode: activeVoucher.code } : {}),
           items: cart.map((c) => ({
             productId: c.productId,
             productName: c.productName,
@@ -141,7 +187,9 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
             options: c.options,
             subtotal: c.unitPrice * c.quantity,
           })),
-          subtotal: totalSnapshot - taxAmount,
+          subtotal: pricing.baseSubtotal,
+          discountAmount: pricing.totalDiscount,
+          voucherCode: activeVoucher?.code ?? null,
           taxRate: taxSettings.enabled ? taxRate ?? 0 : 0,
           taxAmount,
           total: totalSnapshot,
@@ -150,6 +198,7 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
           createdAt: new Date().toISOString(),
         };
         setSuccess({ id: no, transaction });
+        playSuccessSound();
         setPayOpen(false);
         setPaid("");
         setBankId("");
@@ -185,11 +234,18 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
   }
 
   const paymentPanelProps = {
-    subtotal,
+    subtotal: subtotal,
+    productDiscount: pricing.productDiscount,
+    voucherDiscount: pricing.voucherDiscount,
+    totalDiscount: pricing.totalDiscount,
+    voucherLabel: activeVoucher?.code ?? null,
     taxAmount,
-    taxRate,
+    taxRate: taxRate ?? 0,
     taxEnabled: taxSettings.enabled,
     total,
+    voucherInput,
+    setVoucherInput,
+    voucherError,
     method,
     setMethod,
     paid,
@@ -255,6 +311,11 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
                 <p className="mt-1 text-xs text-text-secondary">
                   {formatRupiah(item.unitPrice)} × {item.quantity}
                 </p>
+                {pricing.itemDiscounts[item.id] > 0 ? (
+                  <p className="mt-0.5 text-xs font-medium text-error-600">
+                    Diskon -{formatRupiah(pricing.itemDiscounts[item.id])}
+                  </p>
+                ) : null}
               </div>
               <div className="flex flex-col items-end justify-between">
                 <p className="text-sm font-semibold text-text-primary">
@@ -294,19 +355,26 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
 
       {view === "expanded" ? (
         <div className="border-t border-border p-3">
-          <SummaryRow label="Subtotal" value={formatRupiah(subtotal)} />
+          <VoucherField code={voucherInput} setCode={setVoucherInput} error={voucherError} />
+          <SummaryRow label="Subtotal" value={formatRupiah(pricing.baseSubtotal)} />
+          {pricing.productDiscount > 0 && (
+            <SummaryRow label="Diskon Produk" value={`-${formatRupiah(pricing.productDiscount)}`} />
+          )}
+          {activeVoucher && pricing.voucherDiscount > 0 && (
+            <SummaryRow label={`Voucher ${activeVoucher.code}`} value={`-${formatRupiah(pricing.voucherDiscount)}`} />
+          )}
           <SummaryRow
             label="Pajak"
             value={
               taxSettings.enabled
-                ? `${formatRupiah(taxAmount)} (${Math.round((taxRate ?? 0) * 100)}%)`
+                ? `${formatRupiah(pricing.taxAmount)} (${Math.round((taxRate ?? 0) * 100)}%)`
                 : "Nonaktif"
             }
           />
           <div className="my-2 border-t border-dashed border-border-strong" />
           <div className="flex items-center justify-between">
             <span className="text-sm font-semibold text-text-primary">Total</span>
-            <span className="text-xl font-semibold text-text-primary">{formatRupiah(total)}</span>
+            <span className="text-xl font-semibold text-text-primary">{formatRupiah(pricing.total)}</span>
           </div>
           <Button
             className="mt-3 w-full"
@@ -314,7 +382,7 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
             onClick={() => setPayOpen(true)}
             disabled={cart.length === 0}
           >
-            Konfirmasi Pembayaran · {formatRupiah(total)}
+            Konfirmasi Pembayaran · {formatRupiah(pricing.total)}
           </Button>
         </div>
       ) : (
@@ -397,10 +465,17 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
 
 interface PaymentPanelProps {
   subtotal: number;
+  productDiscount: number;
+  voucherDiscount: number;
+  totalDiscount: number;
+  voucherLabel?: string | null;
   taxAmount: number;
   taxRate: number;
   taxEnabled: boolean;
   total: number;
+  voucherInput: string;
+  setVoucherInput: (v: string) => void;
+  voucherError: string | null;
   method: PaymentMethod;
   setMethod: (m: PaymentMethod) => void;
   paid: string;
@@ -421,10 +496,17 @@ interface PaymentPanelProps {
 
 function PaymentPanel({
   subtotal,
+  productDiscount,
+  voucherDiscount,
+  totalDiscount,
+  voucherLabel,
   taxAmount,
   taxRate,
   taxEnabled,
   total,
+  voucherInput,
+  setVoucherInput,
+  voucherError,
   method,
   setMethod,
   paid,
@@ -445,7 +527,14 @@ function PaymentPanel({
   return (
     <div className="space-y-3">
       <div>
+        <VoucherField code={voucherInput} setCode={setVoucherInput} error={voucherError} />
         <SummaryRow label="Subtotal" value={formatRupiah(subtotal)} />
+        {productDiscount > 0 && (
+          <SummaryRow label="Diskon Produk" value={`-${formatRupiah(productDiscount)}`} />
+        )}
+        {voucherLabel && voucherDiscount > 0 && (
+          <SummaryRow label={`Voucher ${voucherLabel}`} value={`-${formatRupiah(voucherDiscount)}`} />
+        )}
         <SummaryRow
           label="Pajak"
           value={
@@ -600,6 +689,31 @@ function SummaryRow({ label, value }: { label: string; value: string }) {
     <div className="flex items-center justify-between py-0.5 text-sm">
       <span className="text-text-muted">{label}</span>
       <span className="font-medium text-text-primary">{value}</span>
+    </div>
+  );
+}
+
+function VoucherField({
+  code,
+  setCode,
+  error,
+}: {
+  code: string;
+  setCode: (v: string) => void;
+  error: string | null;
+}) {
+  return (
+    <div className="mb-3">
+      <label className="mb-1 block text-xs font-medium text-text-secondary">Kode Voucher (opsional)</label>
+      <Input
+        placeholder="Masukkan kode voucher"
+        className="uppercase font-semibold tracking-wide"
+        value={code.toUpperCase()}
+        onChange={(e) => setCode(e.target.value.toUpperCase())}
+      />
+      {error ? (
+        <p className="mt-1 text-xs font-medium text-error-strong">{error}</p>
+      ) : null}
     </div>
   );
 }

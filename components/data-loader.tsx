@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { useBanks, useCategories, useCashiers, useProducts, useSettings, useTransactions } from "@/lib/api/hooks";
+import { useBanks, useCategories, useCashiers, useDiscounts, useProducts, useSettings, useTransactions, useVouchers } from "@/lib/api/hooks";
 import { usePosStore } from "@/lib/use-pos-store";
 
 export function DataLoader() {
@@ -11,6 +11,8 @@ export function DataLoader() {
   const { data: products } = useProducts();
   const { data: categories } = useCategories();
   const { data: banks } = useBanks();
+  const { data: discounts } = useDiscounts();
+  const { data: vouchers } = useVouchers();
   const { data: settings } = useSettings();
   const { data: transactions } = useTransactions();
 
@@ -26,6 +28,12 @@ export function DataLoader() {
   useEffect(() => {
     if (banks) hydrate({ banks });
   }, [banks, hydrate]);
+  useEffect(() => {
+    if (discounts) hydrate({ discounts });
+  }, [discounts, hydrate]);
+  useEffect(() => {
+    if (vouchers) hydrate({ vouchers });
+  }, [vouchers, hydrate]);
   useEffect(() => {
     if (settings) {
       hydrate({

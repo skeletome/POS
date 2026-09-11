@@ -1,12 +1,22 @@
 "use client";
 
-import { Check, Plus, Search, UtensilsCrossed } from "lucide-react";
+import { ArrowUpDown, Check, Plus, Search, UtensilsCrossed } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { formatRupiah } from "@/lib/format";
 import { orderTypeLabels } from "@/lib/dummy-data";
 import { usePosStore } from "@/lib/use-pos-store";
+import { bestProductDiscount, discountedUnitPrice } from "@/lib/pricing";
 import type { OrderType, Product } from "@/lib/types";
+
+const sortOptions: { value: SortBy; label: string }[] = [
+  { value: "default", label: "Urutan default" },
+  { value: "name", label: "Nama A–Z" },
+  { value: "price_asc", label: "Harga termurah" },
+  { value: "price_desc", label: "Harga termahal" },
+];
+
+type SortBy = "default" | "name" | "price_asc" | "price_desc";
 
 export function ProductGrid({
   onOpen,
@@ -18,34 +28,63 @@ export function ProductGrid({
   const orderType = usePosStore((s) => s.orderType);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<SortBy>("default");
 
   const visibleCategories = categories.filter((c) => c.active);
   const activeProducts = useMemo(() => products.filter((p) => p.active), [products]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return activeProducts
+    const list = activeProducts
       .filter((p) => activeCategory === "all" || p.categoryId === activeCategory)
       .filter((p) => !q || p.name.toLowerCase().includes(q))
       .filter((p) =>
         orderType === "DINE_IN" ? p.dineInAvailable : p.takeawayAvailable,
       );
-  }, [activeProducts, activeCategory, search, orderType]);
+    if (sortBy === "default") return list;
+    const priceOf = (p: Product) =>
+      orderType === "DINE_IN" ? p.dineInPrice : p.takeawayPrice;
+    const copy = [...list];
+    if (sortBy === "name") copy.sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === "price_asc") copy.sort((a, b) => priceOf(a) - priceOf(b));
+    if (sortBy === "price_desc") copy.sort((a, b) => priceOf(b) - priceOf(a));
+    return copy;
+  }, [activeProducts, activeCategory, search, orderType, sortBy]);
 
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4 shrink-0 space-y-3">
-        <div className="relative">
-          <Search
-            size={16}
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
-          />
-          <input
-            className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm text-text-primary placeholder:text-text-placeholder focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
-            placeholder="Cari produk…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+        <div className="flex items-center gap-2">
+          <div className="relative flex-1">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+            />
+            <input
+              className="h-10 w-full rounded-lg border border-border bg-surface pl-9 pr-3 text-sm text-text-primary placeholder:text-text-placeholder focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              placeholder="Cari produk…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="relative shrink-0">
+            <ArrowUpDown
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+            />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortBy)}
+              className="h-10 cursor-pointer rounded-lg border border-border bg-surface pl-8 pr-3 text-sm text-text-secondary transition-colors duration-150 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100"
+              aria-label="Urutkan produk"
+            >
+              {sortOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -123,9 +162,12 @@ function ProductCard({
   onOpen: (p: Product) => void;
 }) {
   const quickAdd = usePosStore((s) => s.quickAdd);
+  const discounts = usePosStore((s) => s.discounts);
   const [added, setAdded] = useState(false);
-  const price =
-    orderType === "DINE_IN" ? product.dineInPrice : product.takeawayPrice;
+  const price = orderType === "DINE_IN" ? product.dineInPrice : product.takeawayPrice;
+
+  const promo = useMemo(() => bestProductDiscount(product.id, price, discounts), [product.id, price, discounts]);
+  const displayPrice = promo ? discountedUnitPrice(price, promo) : price;
 
   const fastAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -155,7 +197,7 @@ function ProductCard({
           "absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-elevated transition-all duration-150",
           added
             ? "bg-success-500 text-white"
-            : "bg-white text-primary-600 hover:scale-110 hover:bg-primary-500 hover:text-white",
+            : "bg-surface text-primary-600 hover:scale-110 hover:bg-primary-500 hover:text-white",
         )}
       >
         {added ? <Check size={15} /> : <Plus size={15} />}
@@ -164,8 +206,22 @@ function ProductCard({
         {product.emoji ?? "🍽️"}
       </div>
       <div className="flex flex-1 flex-col gap-1 p-3">
+{promo ? (
+        <span className="absolute left-2 top-2 z-10 inline-flex items-center gap-1 rounded-md bg-error-500 px-1.5 py-0.5 text-[11px] font-bold text-white shadow-elevated">
+          {promo.discountType === "PERCENT" ? `DISKON ${promo.discountValue}%` : `${formatRupiah(promo.discountValue)} OFF`}
+        </span>
+      ) : null}
         <p className="line-clamp-1 text-sm font-medium text-text-primary">{product.name}</p>
-        <p className="mt-auto text-sm font-semibold text-text-primary">{formatRupiah(price)}</p>
+        <div className="mt-auto">
+          {promo ? (
+            <>
+              <p className="text-[11px] text-text-muted line-through">{formatRupiah(price)}</p>
+              <p className="text-sm font-semibold text-error-600">{formatRupiah(displayPrice)}</p>
+            </>
+          ) : (
+            <p className="text-sm font-semibold text-text-primary">{formatRupiah(price)}</p>
+          )}
+        </div>
         <p className="text-[11px] text-text-muted">{orderTypeLabels[orderType]}</p>
       </div>
     </div>
@@ -180,7 +236,7 @@ export function OrderTypeToggle({
   onChange: (t: OrderType) => void;
 }) {
   return (
-    <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-slate-50 p-1">
+    <div className="mb-3 grid grid-cols-2 gap-1 rounded-lg bg-muted p-1">
       {(["DINE_IN", "TAKEAWAY"] as OrderType[]).map((t) => (
         <button
           key={t}
@@ -189,7 +245,7 @@ export function OrderTypeToggle({
             "cursor-pointer rounded-md px-3 py-1.5 text-sm font-medium transition-colors duration-150",
             orderType === t
               ? "bg-primary-500 text-white"
-              : "text-text-primary hover:bg-white",
+              : "text-text-primary hover:bg-surface",
           )}
         >
           {orderTypeLabels[t]}

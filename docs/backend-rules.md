@@ -27,6 +27,8 @@ Basis: RLS (`is_store_member` / `is_store_owner`). Layer kedua = pengecekan role
 | Mengelola bank | ✅ | ❌ |
 | Mengubah store settings / tax / payment | ✅ | ❌ |
 | Mengelola cashier (buat/nonaktif) | ✅ | ❌ |
+| Mengelola promo diskon & voucher (CRUD) | ✅ | ❌ |
+| Memakai voucher saat checkout | ✅ | ✅ |
 
 RLS memastikan **authorization tidak bisa di-bypass dari client** — role frontend hanya untuk UI.
 
@@ -55,6 +57,12 @@ Base: `/api`. Semua route mewajibkan sesi kecuali disebut tidak.
 | `/api/cashiers` | GET | owner | list kasir (via `get_store_cashiers`) |
 | `/api/cashiers` | POST | owner | create auth user + membership (service_role) |
 | `/api/upload` | POST | member | upload gambar → return URL |
+| `/api/discounts` | GET/POST | member/owner | list & buat promo diskon produk |
+| `/api/discounts/[id]` | PATCH | owner | ubah promo (bisa partial, mis. toggle aktif) |
+| `/api/discounts/[id]` | DELETE | owner | hapus promo |
+| `/api/vouchers` | GET/POST | member/owner | list & buat voucher |
+| `/api/vouchers/[id]` | PATCH | owner | ubah voucher (bisa partial, mis. toggle aktif) |
+| `/api/vouchers/[id]` | DELETE | owner | hapus voucher |
 
 ### Format respons
 
@@ -77,11 +85,13 @@ Semua body divalidasi zod (skema di `lib/schemas`).
 1. Setiap data bisnis memiliki `store_id` milik tenant user (RLS).
 2. User hanya bisa data store tempat ia member (RLS).
 3. **Total transaksi dihitung ulang di DB** (`create_transaction`): subtotal, tax_rate (snapshot dari `stores`), tax_amount, total — nilai client tidak dipercaya.
-4. Produk inactive **tidak bisa** masuk transaksi baru (route handler memfilter + validasi).
-5. Cash: `amountPaid < total` → **ditolak** (route handler cek sebelum RPC).
-6. Prodok/option/tax disimpan sebagai **snapshot** di `transactions` / `transaction_items`.
-7. `transaction_no` `TRX-XXXX` unik per store (sequence lock di DB).
-8. Validasi `active`/format di level DB juga (CHECK constraints, enum).
+4. **Diskon & voucher divalidasi di DB** (`create_transaction`): diskon produk aktif dihitung per item (diskon terbesar jika tumpang tindih), voucher divalidasi (aktif/periode/min subtotal/kuota), `used_count` dinaikkan atomik dalam transaksi DB yang sama. `discount_amount` + `voucher_code` disimpan sebagai snapshot.
+5. Produk inactive **tidak bisa** masuk transaksi baru (route handler memfilter + validasi).
+6. Cash: `amountPaid < total` → **ditolak** (route handler cek sebelum RPC).
+7. Prodok/option/tax disimpan sebagai **snapshot** di `transactions` / `transaction_items`.
+8. `transaction_no` `TRX-XXXX` unik per store (sequence lock di DB).
+9. Validasi `active`/format di level DB juga (CHECK constraints, enum).
+10. Kode voucher **uppercase & unik per store** (`UNIQUE (store_id, code)`); konflik/pernah dipakai → 409.
 
 ## 5. Idempotency & Integritas
 

@@ -29,6 +29,9 @@ auth.uid() ──► is_store_member(store_id) ──► RLS gate ──► stor
                    │               
                    ▼               
              option_groups ──► options
+
+   product_discounts ─► product_discount_items ─► products (many-to-many)
+   vouchers (per store, kode unik)
                    
 transactions ──► transaction_items (snapshot)
 store_sequences (TRX counter per store)
@@ -148,6 +151,9 @@ Semua field untuk snapshot juga disimpan terpisah agar aman dari perubahan.
 | `payment_method` | enum `payment_method` | `CASH` / `BANK_TRANSFER` / `QRIS` |
 | `payment_info` | jsonb | snapshot pembayaran |
 | `status` | enum `transaction_status` | `PENDING` / `COMPLETED` / `CANCELLED` |
+| `discount_amount` | int | total diskon (produk + voucher), ≥ 0 |
+| `voucher_id` | uuid FK → vouchers (SET NULL) | referensi voucher saat transaksi |
+| `voucher_code` | text | snapshot kode voucher |
 | `created_at` | timestamptz | |
 | **UNIQUE** | `(store_id, transaction_no)` | |
 
@@ -189,6 +195,54 @@ Semua field untuk snapshot juga disimpan terpisah agar aman dari perubahan.
 
 Dipakai oleh RPC `next_transaction_no()` dengan `INSERT … ON CONFLICT DO UPDATE` (atomic, `SELECT FOR UPDATE` via row lock).
 
+### `product_discounts` — kampanye diskon produk
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `store_id` | uuid FK → stores | |
+| `name` | text | nama promo (cth. "Hari Kemerdekaan") |
+| `discount_type` | enum `discount_type` | `PERCENT` / `FIXED` |
+| `discount_value` | numeric(10,2) | Persen: 0–100; FIXED: nominal rupiah |
+| `start_date` | date | opsional |
+| `end_date` | date | opsional |
+| `active` | boolean | |
+| `created_at` | timestamptz | |
+| **CHECK** | | `PERCENT → 0 < value <= 100` |
+
+### `product_discount_items` — produk yang ikut promo
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `store_id` | uuid FK | |
+| `discount_id` | uuid FK → product_discounts (cascade) | |
+| `product_id` | uuid FK → products (cascade) | |
+| **UNIQUE** | `(discount_id, product_id)` | |
+
+### `vouchers`
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `store_id` | uuid FK → stores | |
+| `code` | text | uppercase, unik per store |
+| `discount_type` | enum `discount_type` | `PERCENT` / `FIXED` |
+| `discount_value` | numeric(10,2) | Persen: 0–100; FIXED: nominal rupiah |
+| `min_subtotal` | numeric(10,2) | syarat minimal belanja, nullable |
+| `max_discount` | numeric(10,2) | cap diskon untuk PERCENT, nullable |
+| `usage_limit` | int | kuota pemakaian, nullable (tanpa batas) |
+| `used_count` | int | counter pemakaian, naik atomik di `create_transaction` |
+| `valid_from` / `valid_until` | date | periode berlaku, nullable |
+| `active` | boolean | |
+| `created_at` | timestamptz | |
+| **UNIQUE** | `(store_id, code)` | |
+
+Perhitungan diskon di `create_transaction`:
+- Diskon produk per item: `PERCENT → round(line × value/100)`, `FIXED → least(value, line)`; jika promo tumpang tindih, **diskon terbesar** dipakai.
+- Voucher `PERCENT → round(subtotal × value/100)`, di-cap `max_discount`; `FIXED → least(value, subtotal)`.
+- `total_discount = diskon produk + diskon voucher`; `taxable = greatest(subtotal - total_discount, 0)`; `tax = round(taxable × rate)`.
+
 ---
 
 ## Enums (Postgres `create type`)
@@ -198,6 +252,7 @@ public.member_role        ('OWNER', 'CASHIER')
 public.order_type         ('DINE_IN', 'TAKEAWAY')
 public.payment_method     ('CASH', 'BANK_TRANSFER', 'QRIS')
 public.transaction_status ('PENDING', 'COMPLETED', 'CANCELLED')
+public.discount_type      ('PERCENT', 'FIXED')
 ```
 
 ---
@@ -213,7 +268,7 @@ public.transaction_status ('PENDING', 'COMPLETED', 'CANCELLED')
 | `next_transaction_no(store_id)` | SECURITY DEFINER | increment TRX per store |
 | `create_transaction(…)` | SECURITY DEFINER | insert txn + items secara atomik, hitung ulang total di DB |
 
-`create_transaction` **selalu menghitung ulang** subtotal/tax/total dari snapshot item + rate di `stores` — nilai dari client tidak dipercaya.
+`create_transaction` **selalu menghitung ulang** subtotal/tax/total dari snapshot item + rate di `stores` — nilai dari client tidak dipercaya. Sejak V7 juga memvalidasi & menerapkan diskon produk aktif dan voucher (param `p_voucher_code`), menaikkan `used_count` voucher secara atomik dalam transaksi yang sama.
 
 ---
 
@@ -232,6 +287,9 @@ idx_transactions_store_created  (store_id, created_at desc)
 idx_transactions_status         (store_id, status)
 idx_transaction_items_transaction (transaction_id)
 idx_transaction_items_store     (store_id)
+idx_product_discounts_store     (store_id, active)
+idx_product_discount_items_product (product_id)
+idx_vouchers_store_active       (store_id, active)
 ```
 
 ---
