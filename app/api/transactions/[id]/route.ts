@@ -102,6 +102,21 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   try {
     const supabase = await createClient();
+
+    // Pembatalan via RPC `cancel_transaction`: set CANCELLED + restock RETURN
+    // secara atomik & idempotent (satu transaksi DB).
+    if (parsed.data.status === "CANCELLED") {
+      const { data, error } = await supabase.rpc("cancel_transaction", {
+        p_transaction_no: id,
+        p_store_id: auth.ctx.store.id,
+      });
+
+      if (error) return jsonError(error.message ?? "Gagal membatalkan transaksi.", 500);
+      return NextResponse.json({
+        data: { id, status: (data as { status?: string })?.status ?? "CANCELLED" },
+      });
+    }
+
     const { data: txn, error } = await supabase
       .from("transactions")
       .update({ status: parsed.data.status })

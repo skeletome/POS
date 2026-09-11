@@ -18,8 +18,11 @@ import type {
   ProductDiscountInput,
   VoucherInput,
   VoucherUpdateInput,
+  StockMutationInput,
+  StockMovement,
 } from "@/lib/schemas";
 import type { ProductDiscountUpdateInput } from "@/lib/schemas/discount";
+import { usePosStore } from "@/lib/use-pos-store";
 
 interface ApiError {
   error?: { message?: string; code?: string };
@@ -123,6 +126,19 @@ export function useCategories() {
 
 const invalidateProducts = (queryClient: ReturnType<typeof useQueryClient>) => {
   void queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+};
+
+async function fetchProductsIntoStore() {
+  const res = await fetch("/api/products");
+  if (!res.ok) return handleError(res);
+  const { data } = (await res.json()) as { data: { products: Product[] } };
+  usePosStore.getState().setProducts(data.products);
+}
+
+const invalidateStockChanges = (queryClient: ReturnType<typeof useQueryClient>) => {
+  void queryClient.invalidateQueries({ queryKey: queryKeys.products.all });
+  void queryClient.invalidateQueries({ queryKey: queryKeys.stockMovements() });
+  void fetchProductsIntoStore();
 };
 
 export function useCreateProduct() {
@@ -467,7 +483,49 @@ export function useUpdateTransactionStatus(id: string) {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.all });
       void queryClient.invalidateQueries({ queryKey: queryKeys.transactions.detail(id) });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.stockMovements() });
+      void fetchProductsIntoStore();
     },
+  });
+}
+
+export interface StockMovementsParams {
+  productId?: string;
+  type?: string;
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export function useStockMovements(filters: StockMovementsParams = {}) {
+  return useQuery({
+    queryKey: queryKeys.stockMovements(filters),
+    queryFn: async () => {
+      const sp = new URLSearchParams();
+      for (const [key, value] of Object.entries(filters)) {
+        if (value !== undefined && value !== "") sp.set(key, String(value));
+      }
+      const res = await fetch(`/api/stock/movements?${sp.toString()}`);
+      if (!res.ok) return handleError(res);
+      const { data } = (await res.json()) as { data: { movements: StockMovement[] } };
+      return data.movements;
+    },
+  });
+}
+
+export function useStockMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: StockMutationInput) => {
+      const res = await fetch("/api/stock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(input),
+      });
+      if (!res.ok) return handleError(res);
+      return res.json();
+    },
+    onSuccess: () => invalidateStockChanges(queryClient),
   });
 }
 

@@ -26,6 +26,9 @@ export const productSchema = z
     dineInPrice: z.number().min(0, "Harga harus lebih dari 0"),
     takeawayPrice: z.number().min(0, "Harga harus lebih dari 0"),
     active: z.boolean(),
+    trackStock: z.boolean(),
+    stock: z.number().int().min(0, "Stok tidak boleh negatif"),
+    lowStockThreshold: z.number().int().min(0, "Ambang stok minimal 0"),
     optionGroups: z.array(optionGroupSchema),
   })
   .refine((data) => data.dineInAvailable || data.takeawayAvailable, {

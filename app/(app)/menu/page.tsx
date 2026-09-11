@@ -43,6 +43,9 @@ function emptyDraft(): Product {
     dineInPrice: 0,
     takeawayPrice: 0,
     active: true,
+    trackStock: false,
+    stock: 0,
+    lowStockThreshold: 5,
     optionGroups: [],
   };
 }
@@ -59,6 +62,7 @@ export default function MenuPage() {
   const [sortBy, setSortBy] = useState<"name" | "dineInPrice" | "takeawayPrice">("name");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterVersion, setFilterVersion] = useState(0);
+  const [stockFilter, setStockFilter] = useState<"ALL" | "LOW" | "OUT">("ALL");
   const [editing, setEditing] = useState<Product | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Product | null>(null);
@@ -85,10 +89,11 @@ export default function MenuPage() {
       pageSize: pageMeta.pageSize,
       search: search || undefined,
       categoryId: categoryFilter === "ALL" ? undefined : categoryFilter,
+      stockStatus: stockFilter === "ALL" ? undefined : stockFilter,
       sortBy,
       sortDir,
     }),
-    [pageMeta, search, categoryFilter, sortBy, sortDir],
+    [pageMeta, search, categoryFilter, stockFilter, sortBy, sortDir],
   );
 
   const { data: pageData, isLoading, isFetching } = useProductsPage(params);
@@ -174,6 +179,30 @@ export default function MenuPage() {
       ),
     },
     {
+      id: "stock",
+      header: "Stok",
+      enableSorting: false,
+      cell: ({ row }) => {
+        const p = row.original;
+        if (!p.trackStock) return <span className="text-xs text-text-muted">—</span>;
+        const isOut = p.stock <= 0;
+        const isLow = p.stock <= p.lowStockThreshold;
+        return (
+          <Badge
+            className={
+              isOut
+                ? "bg-error-soft text-error-strong"
+                : isLow
+                  ? "bg-warning-soft text-warning-strong"
+                  : "bg-success-soft text-success-strong"
+            }
+          >
+            {isOut ? "Habis" : isLow ? `Menipis (${p.stock})` : `${p.stock}`}
+          </Badge>
+        );
+      },
+    },
+    {
       id: "status",
       accessorKey: "active",
       header: "Status",
@@ -243,21 +272,35 @@ export default function MenuPage() {
           title={`${pageData?.total ?? 0} produk`}
           description="Produk inactive tidak muncul pada POS untuk transaksi baru."
           action={
-            <Select
-              className="w-44"
-              value={categoryFilter}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value);
-                bumpFilters();
-              }}
-            >
-              <option value="ALL">Semua Kategori</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
+            <div className="flex items-center gap-2">
+              <Select
+                className="w-36"
+                value={stockFilter}
+                onChange={(e) => {
+                  setStockFilter(e.target.value as "ALL" | "LOW" | "OUT");
+                  bumpFilters();
+                }}
+              >
+                <option value="ALL">Semua Stok</option>
+                <option value="LOW">Stok Menipis</option>
+                <option value="OUT">Stok Habis</option>
+              </Select>
+              <Select
+                className="w-44"
+                value={categoryFilter}
+                onChange={(e) => {
+                  setCategoryFilter(e.target.value);
+                  bumpFilters();
+                }}
+              >
+                <option value="ALL">Semua Kategori</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
           }
         />
 
@@ -586,6 +629,51 @@ function ProductFormModal({
               </div>
             </div>
             <FormFieldError message={errors.dineInAvailable?.message} />
+          </div>
+        </div>
+
+        <div>
+          <Label>Manajemen Stok</Label>
+          <div className="space-y-3 rounded-lg border border-border p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <Toggle
+                checked={watch("trackStock")}
+                onChange={(trackStock) =>
+                  setValue("trackStock", trackStock, { shouldValidate: true })
+                }
+                label="Lacak stok produk ini"
+              />
+              <span className="text-xs text-text-muted">
+                Stok berkurang otomatis saat transaksi
+              </span>
+            </div>
+            {watch("trackStock") ? (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-muted">Stok awal</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    className="w-32"
+                    {...register("stock", { valueAsNumber: true })}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-text-muted">Ambang stok menipis</span>
+                  <Input
+                    type="number"
+                    min={0}
+                    className="w-32"
+                    {...register("lowStockThreshold", { valueAsNumber: true })}
+                  />
+                </div>
+                <p className="text-xs text-text-muted">
+                  Stok awal hanya dipakai saat membuat produk baru. Untuk menambah/menyesuaikan
+                  stok, gunakan halaman Stok.
+                </p>
+              </>
+            ) : null}
+            <FormFieldError message={errors.stock?.message} />
           </div>
         </div>
 

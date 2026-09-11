@@ -399,6 +399,12 @@ Product inactive:
 
 ---
 
+## PRODUCT-006 — Stock Tracking (Opsional)
+
+Produk dapat mengaktifkan pelacakan stok per produk jadi (lihat # 23. Manajemen Stok Produk). Produk tanpa pelacakan stok dijual tanpa batas.
+
+---
+
 # 10. Category Requirements
 
 | ID | Requirement |
@@ -696,7 +702,42 @@ Voucher adalah kode diskon manual yang dibuat Owner dan dimasukkan kasir saat ch
 
 ---
 
-# 23. Transaction Requirements
+# 23. Manajemen Stok Produk
+
+Stok dihitung **per produk jadi** (menu item / porsi siap jual). Satu unit "Ayam Penyet" = satu unit stok. Pelacakan bahan baku mentah (ayam, tempe, tahu, sambal) beserta resep/BOM **tidak termasuk** MVP ini dan dinyatakan *out of scope* (lihat roadmap). Tujuan: mencegah oversell, memberi sinyal persediaan ke kasir & Owner, dan menyediakan jejak audit (ledger) untuk setiap perubahan stok.
+
+**Gambaran alur:**
+
+```mermaid
+flowchart LR
+    A[Tambah Stok / Pembelian<br/>PURCHASE +qty] --> P[products.stock]
+    C[Transaksi selesai<br/>create_transaction SALE −qty] --> P
+    R[Cancel / Retur<br/>RETURN +qty] --> P
+    O[Owner: Sesuaikan / Opname<br/>ADJUSTMENT/OPNAME ±delta] --> P
+    P --> L[(stock_movements<br/>ledger immutable, balance_after)]
+```
+
+Mutasi stok **hanya boleh terjadi di server (database)** — klien tidak pernah menulis stok langsung.
+
+**Aturan:**
+
+| ID | Requirement |
+|---|---|
+| STOK-001 | Setiap produk dapat mengaktifkan flag `track_stock`. Produk tanpa flag diabaikan dalam semua penghitungan stok (bisa dijual tanpa batas). |
+| STOK-002 | Stok dihitung per produk jadi (menu item). Bahan baku & resep (BOM) di luar scope MVP. |
+| STOK-003 | Stok tidak pernah negatif (`stock >= 0`, dijaga constraint + logika server). |
+| STOK-004 | Saat transaksi disimpan (`create_transaction`), stok produk ber-track menurun sesuai qty item — penurunan dilakukan **atomik** di database dalam satu transaksi yang sama dengan penyimpanan transaksi. |
+| STOK-005 | Jika qty melebihi stok tersedia, seluruh transaksi **ditolak** (rollback) dengan pesan jelas, mis. "Stok Ayam Penyet tidak mencukupi". |
+| STOK-006 | Produk dengan `stock <= low_stock_threshold` berstatus "Stok menipis"; `stock = 0` berstatus "Habis" dan tidak dapat ditambahkan ke cart (cek client sebagai kenyamanan; cek server tetap otoritas). |
+| STOK-007 | Setiap mutasi stok tercatat di tabel ledger `stock_movements` yang **immutable**: tipe (`SALE/RETURN/PURCHASE/ADJUSTMENT/OPNAME`), nilai delta (tanda +/-), saldo setelah mutasi (`balance_after`), pelaku (`created_by`), waktu, dan catatan wajib untuk mutasi non-jualan. Tidak ada izin UPDATE/DELETE pada data ledger. |
+| STOK-008 | Pembatalan transaksi (status COMPLETED → CANCELLED) mengembalikan stok otomatis dan dicatat sebagai `RETURN`; proses idempotent (tidak boleh menambah stok dua kali pada pembatalan yang sama). |
+| STOK-009 | Hanya Owner yang dapat menambah stok (PURCHASE), menyesuaikan stok (ADJUSTMENT — nilai mutlak), dan melakukan opname (OPNAME — pakai jumlah fisik, selisih dihitung otomatis). Setiap mutasi non-jualan wajib menyertakan catatan/alasannya. |
+| STOK-010 | Produk nonaktif atau yang tidak melacak stok tidak dapat disesuaikan stoknya; produk nonaktif tetap terbaca di riwayat transaksi & ledger. |
+| STOK-011 | Indikator stok ditampilkan di UI: badge stok pada kartu produk POS, kartu "Stok menipis" di dashboard, filter stok di manajemen menu, dan halaman Stok (ringkasan + riwayat + aksi). |
+
+---
+
+# 24. Transaction Requirements
 
 Transaction minimal memiliki:
 
@@ -725,7 +766,7 @@ Created At
 
 ---
 
-# 24. Transaction Snapshot
+# 25. Transaction Snapshot
 
 | ID | Requirement |
 |---|---|
@@ -736,7 +777,7 @@ Created At
 
 ---
 
-# 25. Transaction History
+# 26. Transaction History
 
 | ID | Requirement |
 |---|---|
@@ -747,7 +788,7 @@ Created At
 
 ---
 
-# 26. Reports
+# 27. Reports
 
 | ID | Requirement |
 |---|---|
@@ -758,7 +799,7 @@ Created At
 
 ---
 
-# 27. Menu Management
+# 28. Menu Management
 
 | ID | Requirement |
 |---|---|
@@ -769,7 +810,7 @@ Created At
 
 ---
 
-# 28. Store Settings
+# 29. Store Settings
 
 Owner dapat mengatur:
 
@@ -783,7 +824,7 @@ Owner dapat mengatur:
 
 ---
 
-# 29. Payment Method Configuration
+# 30. Payment Method Configuration
 
 Owner dapat mengaktifkan/menonaktifkan payment method.
 
@@ -797,7 +838,7 @@ QRIS          [OFF]
 
 ---
 
-# 30. User / Cashier Management
+# 31. User / Cashier Management
 
 Owner dapat:
 - Create cashier.
@@ -809,7 +850,7 @@ Owner dapat:
 
 ---
 
-# 31. Authorization Rules
+# 32. Authorization Rules
 
 ```
 OWNER
@@ -828,7 +869,7 @@ CASHIER
 
 ---
 
-# 32. Data Integrity Requirements
+# 33. Data Integrity Requirements
 
 | Requirement | Keterangan |
 |---|---|
@@ -839,7 +880,7 @@ CASHIER
 
 ---
 
-# 33. Transaction Calculation Rules
+# 34. Transaction Calculation Rules
 
 ```
 item_unit_price = product_price + selected_option_charges
@@ -857,7 +898,7 @@ total = subtotal + tax
 
 ---
 
-# 34. POS Transaction Flow
+# 35. POS Transaction Flow
 
 ```
 Login → Open POS → Search/Filter → Select Product
@@ -870,7 +911,7 @@ Login → Open POS → Search/Filter → Select Product
 
 ---
 
-# 35. Cash Transaction Flow
+# 36. Cash Transaction Flow
 
 ```
 Cart → Checkout → Cash → Enter Amount Paid
@@ -880,7 +921,7 @@ Cart → Checkout → Cash → Enter Amount Paid
 
 ---
 
-# 36. Bank Transaction Flow
+# 37. Bank Transaction Flow
 
 ```
 Cart → Checkout → Bank Transfer → Select Bank
@@ -890,7 +931,7 @@ Cart → Checkout → Bank Transfer → Select Bank
 
 ---
 
-# 37. QRIS Transaction Flow
+# 38. QRIS Transaction Flow
 
 ```
 Cart → Checkout → QRIS → Display Store QR
@@ -900,7 +941,7 @@ Cart → Checkout → QRIS → Display Store QR
 
 ---
 
-# 38. Error Handling
+# 39. Error Handling
 
 | Kategori | Error |
 |---|---|
@@ -912,7 +953,7 @@ Cart → Checkout → QRIS → Display Store QR
 
 ---
 
-# 39. Duplicate Transaction Protection
+# 40. Duplicate Transaction Protection
 
 Sistem harus mencegah pembuatan transaksi duplicate menggunakan:
 - Disabled submit state.
@@ -923,7 +964,7 @@ Sistem harus mencegah pembuatan transaksi duplicate menggunakan:
 
 ---
 
-# 40. Loading & UX Requirements
+# 41. Loading & UX Requirements
 
 POS harus memberikan feedback ketika:
 - Product sedang dimuat.
@@ -934,7 +975,7 @@ POS harus memberikan feedback ketika:
 
 ---
 
-# 41. Responsive Requirements
+# 42. Responsive Requirements
 
 | Priority | Platform |
 |---|---|
@@ -954,7 +995,7 @@ Product area ↓ Cart/Checkout
 
 ---
 
-# 42. Performance Requirements
+# 43. Performance Requirements
 
 Operasi berikut harus terasa responsive:
 - Search, Category filtering, Add to cart, Quantity update, Open customization, Checkout.
@@ -963,7 +1004,7 @@ Operasi berikut harus terasa responsive:
 
 ---
 
-# 43. Security Requirements
+# 44. Security Requirements
 
 Sistem harus:
 - Menggunakan authentication dan authorization.
@@ -976,7 +1017,7 @@ Sistem harus:
 
 ---
 
-# 44. Auditability
+# 45. Auditability
 
 Transaksi harus menyimpan minimal:
 
@@ -990,7 +1031,7 @@ payment_method
 
 ---
 
-# 45. Acceptance Criteria — Authentication
+# 46. Acceptance Criteria — Authentication
 
 | ID | Given | When | Then |
 |---|---|---|---|
@@ -1000,7 +1041,7 @@ payment_method
 
 ---
 
-# 46. Acceptance Criteria — Product
+# 47. Acceptance Criteria — Product
 
 | ID | Given | When | Then |
 |---|---|---|---|
@@ -1010,7 +1051,7 @@ payment_method
 
 ---
 
-# 47. Acceptance Criteria — Options
+# 48. Acceptance Criteria — Options
 
 | ID | Given | When | Then |
 |---|---|---|---|
@@ -1020,7 +1061,7 @@ payment_method
 
 ---
 
-# 48. Acceptance Criteria — Checkout
+# 49. Acceptance Criteria — Checkout
 
 | ID | Given | When | Then |
 |---|---|---|---|
@@ -1034,7 +1075,7 @@ payment_method
 
 ---
 
-# 49. Acceptance Criteria — Payment
+# 50. Acceptance Criteria — Payment
 
 | ID | Requirement |
 |---|---|
@@ -1045,7 +1086,7 @@ payment_method
 
 ---
 
-# 50. Acceptance Criteria — Snapshot
+# 51. Acceptance Criteria — Snapshot
 
 | ID | Given | When | Then |
 |---|---|---|---|
@@ -1056,7 +1097,7 @@ payment_method
 
 ---
 
-# 51. Acceptance Criteria — Transaction History
+# 52. Acceptance Criteria — Transaction History
 
 | ID | Requirement |
 |---|---|
@@ -1066,7 +1107,7 @@ payment_method
 
 ---
 
-# 52. Acceptance Criteria — Reports
+# 53. Acceptance Criteria — Reports
 
 | ID | Requirement |
 |---|---|
@@ -1077,7 +1118,7 @@ payment_method
 
 ---
 
-# 53. Definition of Done — MVP
+# 54. Definition of Done — MVP
 
 ### Authentication
 - [ ] Login bekerja.
@@ -1107,6 +1148,15 @@ payment_method
 - [ ] Owner dapat CRUD voucher (termasuk syarat & kuota).
 - [ ] Diskon produk & voucher diterapkan di checkout dan disimpan transaksi.
 - [ ] Kuota voucher ditegakkan server-side secara atomik.
+
+### Stok
+- [ ] Produk bisa mengaktifkan pelacakan stok (track_stock).
+- [ ] Checkout menurunkan stok secara atomik; oversell ditolak (rollback) dengan pesan jelas.
+- [ ] Pembatalan transaksi mengembalikan stok otomatis & idempotent.
+- [ ] Leader immutable: semua mutasi tercatat di stock_movements (tipe, delta, balance_after, pelaku, waktu).
+- [ ] Hanya Owner yang dapat tambah stok / sesuaikan / opname (wajib catatan).
+- [ ] Halaman Stok menampilkan ringkasan, tabel stok, dan riwayat pergerakan.
+- [ ] Indikator: badge stok di POS, kartu stok menipis di dashboard, filter di menu.
 
 ### Payment
 - [ ] Cash bekerja.
@@ -1148,7 +1198,7 @@ payment_method
 
 ---
 
-# 54. MVP User Journey
+# 55. MVP User Journey
 
 ## Owner Journey
 
@@ -1158,9 +1208,10 @@ Register/Login → Create/Access Store → Configure Store
 → Configure Bank → Configure QRIS
 → Create Categories → Create Products
 → Configure Product Options → Create Cashier
-→ Create Promotions/Vouchers
+→ Create Promotions/Vouchers → Configure Stock (toggle + stok awal + ambang)
 → Cashier Starts Selling
-→ Owner Monitors Dashboard → Owner Reviews Reports
+→ Owner Monitors Dashboard → Owner Checks Stock (tambah/sesuaikan/opname, riwayat)
+→ Owner Reviews Reports
 ```
 
 ## Cashier Journey
@@ -1170,14 +1221,15 @@ Login → Open POS → Search Product → Select Product
 → Customize → Add to Cart → Select Dine-in/Takeaway
 → Review Cart → Apply Voucher → Checkout → Select Payment
 → Confirm Payment → Transaction Completed
+→ (Produk habis/menipis ditandai di POS; qty dibatasi stok tersedia)
 ```
 
 ---
 
-# 55. Future Roadmap
+# 56. Future Roadmap
 
 ## V2
-- Inventory, Barcode, Receipt printer.
+- ~~Inventory~~ **✓ Implemented** (stok per produk jadi, lihat #23), Barcode, Receipt printer.
 - ~~Table management~~ (belum), ~~Discount, Promotion~~ **✓ Implemented** (lihat #21–#22), Customer management.
 
 ## V3
@@ -1190,13 +1242,13 @@ Login → Open POS → Search Product → Select Product
 
 ---
 
-# 56. Product Principles
+# 57. Product Principles
 
 ### 1. Transaction First
 Historical transaction adalah data yang harus dipertahankan secara akurat.
 
 ### 2. Server Is Source of Truth
-Frontend tidak boleh menjadi sumber kebenaran final untuk: Authorization, Price, Tax, Total, Transaction status.
+Frontend tidak boleh menjadi sumber kebenaran final untuk: Authorization, Price, Tax, Total, Stock, Transaction status.
 
 ### 3. Configuration Over Hardcoding
 Data seperti Category, Bank, Product options, Tax, Payment method harus dibuat configurable.
@@ -1206,8 +1258,8 @@ Jangan memasukkan fitur yang belum dibutuhkan MVP.
 
 ```
 NO PAYMENT GATEWAY
-NO INVENTORY
-NO STOCK MANAGEMENT
+NO RECIPE / BOM INVENTORY (bahan baku mentah)
+NO SUPPLIER MANAGEMENT
 ```
 
 ### 5. Future-Friendly Architecture
@@ -1215,7 +1267,7 @@ Arsitektur Store dan Membership harus memungkinkan pengembangan di masa depan ta
 
 ---
 
-# 57. MVP Scope Summary
+# 58. MVP Scope Summary
 
 ```
 POS KASIR MVP
@@ -1258,6 +1310,12 @@ POS KASIR MVP
 │   ├── History
 │   └── Detail
 │
+├── Stock
+│   ├── Stok per produk (track_stock opsional)
+│   ├── Decrement saat checkout + restock saat cancel
+│   ├── Riwayat pergerakan (ledger immutable)
+│   └── Tambah stok / Sesuaikan / Opname (Owner)
+│
 ├── Dashboard
 │
 ├── Reports
@@ -1272,7 +1330,7 @@ POS KASIR MVP
 
 ---
 
-# 58. Final MVP Boundary
+# 59. Final MVP Boundary
 
 MVP POS Kasir bertujuan menyelesaikan satu core workflow:
 
@@ -1280,10 +1338,11 @@ MVP POS Kasir bertujuan menyelesaikan satu core workflow:
 Manage Menu → Select Product → Customize Product
 → Select Dine-in/Takeaway → Calculate Price + Tax
 → Confirm Payment → Create Transaction Snapshot
-→ View Transaction → Analyze Sales
+→ View Transaction → Manage Stock (track, restok, opname)
+→ Analyze Sales
 ```
 
-> MVP **tidak bertujuan menjadi sistem accounting, inventory, supplier management, atau payment processor**.
+> MVP **tidak bertujuan menjadi sistem accounting, supplier management, inventory bahan baku/recipe (BOM), atau payment processor**. Stok yang termasuk MVP terbatas pada stok per produk jadi (lihat #23).
 
 **Fokus utama:**
 > Membuat proses penjualan makanan/minuman menjadi **cepat, terstruktur, dan dapat dilacak**.

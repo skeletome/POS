@@ -55,6 +55,9 @@ export function ProductModal({
 
   const unitPrice = basePrice + optionCharge;
 
+  const maxQty = product?.trackStock ? Math.max(0, product.stock) : Number.POSITIVE_INFINITY;
+  const outOfStock = product?.trackStock && product.stock <= 0;
+
   const toggleSingle = (groupId: string, optionId: string) => {
     setSelections((prev) => ({ ...prev, [groupId]: [optionId] }));
   };
@@ -71,6 +74,7 @@ export function ProductModal({
 
   const add = () => {
     if (!product) return;
+    if (maxQty <= 0) return;
     const options = ([] as CartItem["options"]).concat(
       ...product.optionGroups.map((g) =>
         (selections[g.id] ?? []).map((optId) => {
@@ -134,6 +138,12 @@ export function ProductModal({
             </p>
           )}
 
+          {outOfStock ? (
+            <p className="mt-3 rounded-lg bg-error-soft px-3 py-2 text-xs font-medium text-error-strong">
+              Stok produk ini sedang habis dan tidak dapat ditambahkan.
+            </p>
+          ) : null}
+
           <div className="mt-5 flex items-center justify-between gap-4 border-t border-border pt-4">
             <div>
               <p className="text-xs text-text-muted">Harga per item</p>
@@ -153,16 +163,22 @@ export function ProductModal({
                 {quantity}
               </span>
               <button
-                onClick={() => setQuantity((q) => q + 1)}
-                className="cursor-pointer flex h-9 w-9 items-center justify-center rounded-lg border border-border text-text-secondary hover:bg-surface-secondary"
+                onClick={() => setQuantity((q) => Math.min(maxQty, q + 1))}
+                disabled={quantity >= maxQty}
+                className="cursor-pointer flex h-9 w-9 items-center justify-center rounded-lg border border-border text-text-secondary hover:bg-surface-secondary disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Tambah jumlah"
               >
                 <Plus size={16} />
               </button>
             </div>
           </div>
+          {Number.isFinite(maxQty) ? (
+            <p className="mt-1 text-right text-xs text-text-muted">
+              Stok tersedia: {maxQty}
+            </p>
+          ) : null}
 
-          <Button className="mt-4 w-full" size="lg" onClick={add}>
+          <Button className="mt-4 w-full" size="lg" onClick={add} disabled={outOfStock}>
             <ShoppingCart size={18} />
             Tambah ke Keranjang · {formatRupiah(unitPrice * quantity)}
           </Button>

@@ -66,6 +66,7 @@ export interface PosState {
   setPaymentSettings: (p: PaymentSettings) => void;
   setDiscounts: (d: ProductDiscount[]) => void;
   setVouchers: (v: Voucher[]) => void;
+  setProducts: (p: Product[]) => void;
 
   setOrderType: (t: OrderType) => void;
   addToCart: (item: CartItem) => void;
@@ -118,6 +119,7 @@ export const usePosStore = create<PosState>((set, get) => ({
   setPaymentSettings: (paymentSettings) => set({ paymentSettings }),
   setDiscounts: (discounts) => set({ discounts }),
   setVouchers: (vouchers) => set({ vouchers }),
+  setProducts: (products) => set({ products }),
 
   setOrderType: (orderType) => set({ orderType }),
   addToCart: (item) => set((s) => ({ cart: [...s.cart, item] })),

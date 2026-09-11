@@ -37,26 +37,26 @@ Setiap item dilengkapi acceptance criteria yang dapat diverifikasi secara teknis
 
 # 3. P0 — Prasyarat Operasional Toko Nyata
 
-## 3.1 Inventory & Stok
+## 3.1 Inventory & Stok — ✅ **SUDAH DIIMPLEMENTASI** (12 Sep 2026)
 
 **Deskripsi:** Kelola stok produk; transaksi yang diselesaikan otomatis mengurangi stok; peringatan stok menipis (low-stock) di dashboard; stok opname (penyesuaian stok fisik).
 
-**Dampak skema/data:**
-- `products`: tambah kolom `stock` (nullable), `low_stock_threshold` (nullable), `track_stock` (boolean).
-- Tabel baru `stock_movements` (produk, qty, jenis: `SALE / PURCHASE / ADJUSTMENT / RETURN`, ref transaksi, dicatat oleh user, timestamp).
-- Tabel `stock_opnames` (produk, stok sistem vs fisik, selisih, catatan).
+> **Keputusan model: Model 1 — stok per produk jadi.** 1 unit stok = 1 porsi/menu jadi yang dijual (mis. 1 porsi "Ayam Penyet" = 1 unit stok). Bahan baku/resep (BOM) **tidak** dilacak — ditetapkan di Non-Goals PRD (lihat PRD §23 & #59).
 
-**Role & permission:** Kasir otomatis menurunkan stok (via server, bukan client). Hanya OWNER yang boleh stok opname/admin—justment.
+**Status implementasi:**
+- `products`: kolom `track_stock` (boolean), `stock` (int ≥ 0), `low_stock_threshold` (int, default 5).
+- Tabel `stock_movements` (ledger immutable): tipe `SALE / RETURN / PURCHASE / ADJUSTMENT / OPNAME`, quantity bertanda, `balance_after` per baris, referensi transaksi & pelaku. RLS: SELECT=member, INSERT=owner, tanpa UPDATE/DELETE.
+- `create_transaction` memotong stok **atomik** (`SELECT … FOR UPDATE` + tolak bila `stock < qty`) dan mencatat `SALE`.
+- `cancel_transaction` membatalkan + mengembalikan stok (`RETURN`) secara atomik & idempotent (pembatalan transaksi di UI otomatis restock).
+- `stock_mutation` (RPC, owner-only): `PURCHASE` (tambah stok barang masuk), `ADJUST` (penyesuaian), `OPNAME` (hitung fisik; selisih vs stok sistem); catatan wajib untuk ADJUST/OPNAME.
+- UI: halaman `/stok` (ringkasan, stok per produk, riwayat mutasi dengan filter, modal mutasi), badge & "Stok habis" (disable) di POS, cap qty di modal produk & keranjang, filter stok + kolom Stok + toggle "Lacak stok" di Menu & Produk, alert "Stok menipis" di dashboard.
+- Detail: PRD §23 (Manajemen Stok Produk), migration V8.
 
-**Catatan RLS:** `stock_movements` di-scope by `store_id`; pengurangan stok dieksekusi di server (route transaksi), jangan pernah dari client.
+**Catatan deviasi dari draft:** tabel `stock_opnames` **tidak dibuat** — opname dicatat langsung sebagai baris `stock_movements` tipe `OPNAME` (lebih sederhana, ledger tetap single-source-of-truth). `RETURN` dipakai untuk restock saat pembatalan transaksi (refund parsial ada di 3.2).
 
-**Acceptance criteria:**
-1. Produk bertipe `track_stock` menolak checkout melebihi stok (`qty > stock` → error).
-2. Transaksi selesai → `stock` produk berkurang tepat sesuai qty item.
-3. Retur → stok kembali bertambah.
-4. Produk dengan `stock <= low_stock_threshold` muncul di indikator "Stok menipis" pada dashboard/menu.
-5. Semua perubahan stok tercatat di `stock_movements` dengan pelaku & timestamp.
-6. Hanya OWNER dapat membuat adjustment/opname; kasir tidak.
+**Sisa (penyempurnaan di masa depan):**
+- Laporan menampilkan nilai stok & COGS per periode.
+- Stock minimum optimal / otomatisasi PO ke supplier (lihat Non-Goals: supplier management belum di-MVP-kan).
 
 ## 3.2 Retur / Refund
 

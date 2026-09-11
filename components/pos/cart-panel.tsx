@@ -40,6 +40,7 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
   const vouchers = usePosStore((s) => s.vouchers);
   const user = usePosStore((s) => s.user);
   const qrisName = usePosStore((s) => s.storeSettings.storeName);
+  const products = usePosStore((s) => s.products);
 
   const [view, setView] = useState<"expanded" | "compact">("expanded");
   const [payOpen, setPayOpen] = useState(false);
@@ -296,7 +297,11 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
         />
       ) : (
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-          {cart.map((item) => (
+          {cart.map((item) => {
+            const prod = products.find((p) => p.id === item.productId);
+            const maxQty = prod?.trackStock && prod.stock >= 0 ? prod.stock : Number.POSITIVE_INFINITY;
+            const atMax = Number.isFinite(maxQty) && item.quantity >= maxQty;
+            return (
             <div
               key={item.id}
               className="flex gap-3 border-b border-border-light py-4 last:border-0"
@@ -314,6 +319,11 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
                 {pricing.itemDiscounts[item.id] > 0 ? (
                   <p className="mt-0.5 text-xs font-medium text-error-600">
                     Diskon -{formatRupiah(pricing.itemDiscounts[item.id])}
+                  </p>
+                ) : null}
+                {Number.isFinite(maxQty) && item.quantity >= maxQty ? (
+                  <p className="mt-0.5 text-xs font-medium text-warning-strong">
+                    Maksimal {maxQty} sesuai stok
                   </p>
                 ) : null}
               </div>
@@ -334,7 +344,8 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
                   </span>
                   <button
                     onClick={() => changeQuantity(item.id, 1)}
-                    className="cursor-pointer flex h-7 w-7 items-center justify-center rounded border border-border text-text-secondary hover:bg-surface-secondary"
+                    disabled={atMax}
+                    className="cursor-pointer flex h-7 w-7 items-center justify-center rounded border border-border text-text-secondary hover:bg-surface-secondary disabled:cursor-not-allowed disabled:opacity-40"
                     aria-label="Tambah"
                   >
                     <Plus size={13} />
@@ -349,7 +360,8 @@ export function CartPanel({ onPrint }: { onPrint?: (transaction: Transaction) =>
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 

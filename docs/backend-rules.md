@@ -28,6 +28,9 @@ Basis: RLS (`is_store_member` / `is_store_owner`). Layer kedua = pengecekan role
 | Mengubah store settings / tax / payment | ✅ | ❌ |
 | Mengelola cashier (buat/nonaktif) | ✅ | ❌ |
 | Mengelola promo diskon & voucher (CRUD) | ✅ | ❌ |
+| Melihat stok & riwayat mutasi | ✅ | ✅ |
+| Mutasi stok (PURCHASE/ADJUST/OPNAME) | ✅ | ❌ |
+| Membatalkan transaksi (restock otomatis) | ✅ | ❌ |
 | Memakai voucher saat checkout | ✅ | ✅ |
 
 RLS memastikan **authorization tidak bisa di-bypass dari client** — role frontend hanya untuk UI.
@@ -63,6 +66,8 @@ Base: `/api`. Semua route mewajibkan sesi kecuali disebut tidak.
 | `/api/vouchers` | GET/POST | member/owner | list & buat voucher |
 | `/api/vouchers/[id]` | PATCH | owner | ubah voucher (bisa partial, mis. toggle aktif) |
 | `/api/vouchers/[id]` | DELETE | owner | hapus voucher |
+| `/api/stock` | POST | owner | mutasi stok manual (RPC `stock_mutation`) |
+| `/api/stock/movements` | GET | member | riwayat ledger stok (filter product/type/from/to/limit) |
 
 ### Format respons
 
@@ -92,10 +97,14 @@ Semua body divalidasi zod (skema di `lib/schemas`).
 8. `transaction_no` `TRX-XXXX` unik per store (sequence lock di DB).
 9. Validasi `active`/format di level DB juga (CHECK constraints, enum).
 10. Kode voucher **uppercase & unik per store** (`UNIQUE (store_id, code)`); konflik/pernah dipakai → 409.
+11. **Stok hanya ditulis di server/DB** — client tidak pernah mengirim angka stok final untuk transaksi. `create_transaction` memotong stok dengan `SELECT … FOR UPDATE` + check `stock >= qty` (tolak oversell) + tulis baris `SALE` (dengan `balance_after`).
+12. **Pembatalan = restock atomik**: `cancel_transaction` (owner) mengembalikan stok (tipe `RETURN`) dalam transaksi DB yang sama; idempotent — transaksi yang sudah CANCELLED tidak diubah ulang.
+13. **Mutasi stok manual hanya Owner** via RPC `stock_mutation` (`note` wajib untuk ADJUSTMENT/OPNAME); ledger **immutable** (tanpa policy UPDATE/DELETE di `stock_movements`).
 
 ## 5. Idempotency & Integritas
 
 - `create_transaction` atomik (single RPC): dapat nomor TRX + insert txn + items dalam satu transaksi DB. Gagal → tidak ada partial write.
+- `cancel_transaction` atomik & **idempotent**: status yang sudah `CANCELLED` → no-op, tidak double-restock.
 - Duplikat pencegahan: tidak ada retry otomatis di sisi client; owner/cashier hanya bisa kirim sekali submit saat checkout sukses (clear cart).
 
 ## 6. Storage Rules

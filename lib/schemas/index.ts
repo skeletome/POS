@@ -45,3 +45,12 @@ export {
   type TransactionStatusUpdateInput,
   type PaymentInfoInput,
 } from "./transaction";
+export {
+  movementTypeSchema,
+  stockMutationTypeSchema,
+  stockMutationSchema,
+  type MovementType,
+  type StockMutationType,
+  type StockMutationInput,
+  type StockMovement,
+} from "./stock";

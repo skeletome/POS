@@ -62,6 +62,10 @@ export async function GET(request: Request) {
   const rawSortDir = url.searchParams.get("sortDir");
   const sortDir = rawSortDir === "desc" ? "desc" : rawSortDir === "asc" ? "asc" : "asc";
 
+  const rawStockStatus = url.searchParams.get("stockStatus");
+  const stockStatus =
+    rawStockStatus === "LOW" || rawStockStatus === "OUT" ? rawStockStatus : undefined;
+
   try {
     const supabase = await createClient();
     const { products, total } = await listProductsPage(supabase, auth.ctx.store.id, {
@@ -69,6 +73,7 @@ export async function GET(request: Request) {
       pageSize,
       search: url.searchParams.get("search")?.trim() || undefined,
       categoryId: url.searchParams.get("categoryId")?.trim() || undefined,
+      stockStatus,
       sortBy,
       sortDir,
     });

@@ -4,6 +4,7 @@ import {
   ArrowUpRight,
   Banknote,
   CreditCard,
+  PackageSearch,
   QrCode,
   ReceiptText,
   ShoppingBag,
@@ -34,8 +35,46 @@ import { formatRupiah } from "@/lib/format";
 import { paymentMethodLabels } from "@/lib/dummy-data";
 import { usePosStore } from "@/lib/use-pos-store";
 import type { PaymentMethod } from "@/lib/types";
+import type { Product } from "@/lib/types";
 import type { ColumnDef } from "@tanstack/react-table";
 import { DataTable } from "@/components/data-table";
+
+function LowStockAlert({ products }: { products: Product[] }) {
+  const tracked = products.filter((p) => p.trackStock);
+  const out = tracked.filter((p) => p.stock <= 0);
+  const low = tracked.filter((p) => p.stock > 0 && p.stock <= p.lowStockThreshold);
+
+  if (out.length === 0 && low.length === 0) return null;
+
+  const names = [
+    ...low.map((p) => `${p.name} (${p.stock})`),
+    ...out.map((p) => p.name),
+  ];
+
+  return (
+    <div className="flex items-start gap-3 rounded-xl border border-warning-soft bg-warning-soft px-4 py-3">
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-warning-strong/10 text-warning-strong">
+        <PackageSearch size={18} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-warning-strong">
+          {out.length > 0
+            ? `${out.length} produk stok habis`
+            : `${low.length} produk stok menipis`}
+        </p>
+        <p className="mt-0.5 line-clamp-2 text-xs text-text-secondary">
+          {names.slice(0, 5).join(", ")}
+          {names.length > 5 ? `, +${names.length - 5} lainnya` : ""}
+        </p>
+      </div>
+      <Link href="/stok" className="shrink-0">
+        <Button variant="secondary" size="sm">
+          Kelola stok
+        </Button>
+      </Link>
+    </div>
+  );
+}
 
 function StatCard({
   label,
@@ -236,6 +275,8 @@ export default function DashboardPage() {
           </div>
         ) : null}
       </div>
+
+      <LowStockAlert products={products} />
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

@@ -15,6 +15,9 @@ export interface ProductRow {
   dine_in_price: number;
   takeaway_price: number;
   active: boolean;
+  track_stock: boolean;
+  stock: number;
+  low_stock_threshold: number;
   created_at?: string;
   updated_at?: string;
 }
@@ -52,6 +55,9 @@ export function toProduct(
     dineInPrice: product.dine_in_price,
     takeawayPrice: product.takeaway_price,
     active: product.active,
+    trackStock: product.track_stock,
+    stock: product.stock,
+    lowStockThreshold: product.low_stock_threshold,
     optionGroups: optionGroups.map((g) => ({
       id: g.id,
       name: g.name,
@@ -107,11 +113,14 @@ const PRODUCT_SORT_COLUMNS = {
 
 export type ProductSortBy = keyof typeof PRODUCT_SORT_COLUMNS;
 
+export type ProductStockStatus = "ALL" | "LOW" | "OUT";
+
 export interface ListProductsPageParams {
   page: number;
   pageSize: number;
   search?: string;
   categoryId?: string;
+  stockStatus?: ProductStockStatus;
   sortBy?: ProductSortBy;
   sortDir?: "asc" | "desc";
 }
@@ -126,6 +135,7 @@ export async function listProductsPage(
     pageSize,
     search,
     categoryId,
+    stockStatus,
     sortBy = "name",
     sortDir = "asc",
   } = params;
@@ -137,6 +147,15 @@ export async function listProductsPage(
     let query = q.eq("store_id", storeId);
     if (categoryId) query = query.eq("category_id", categoryId);
     if (search) query = query.ilike("name", `%${search}%`);
+    if (stockStatus === "LOW") {
+      query = query
+        .eq("track_stock", true)
+        .gt("stock", 0)
+        .or("stock.lt.low_stock_threshold");
+    }
+    if (stockStatus === "OUT") {
+      query = query.eq("track_stock", true).eq("stock", 0);
+    }
     return query;
   };
 
@@ -232,6 +251,9 @@ export function productToRow(input: ProductInput, storeId: string): ProductRow {
     dine_in_price: input.dineInPrice,
     takeaway_price: input.takeawayPrice,
     active: input.active,
+    track_stock: input.trackStock,
+    stock: input.stock,
+    low_stock_threshold: input.lowStockThreshold,
   };
 }
 
@@ -272,6 +294,9 @@ export async function updateProductAndOptions(
       dine_in_price: row.dine_in_price,
       takeaway_price: row.takeaway_price,
       active: row.active,
+      track_stock: row.track_stock,
+      stock: row.stock,
+      low_stock_threshold: row.low_stock_threshold,
     })
     .eq("id", productId)
     .eq("store_id", storeId);

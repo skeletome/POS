@@ -169,8 +169,12 @@ function ProductCard({
   const promo = useMemo(() => bestProductDiscount(product.id, price, discounts), [product.id, price, discounts]);
   const displayPrice = promo ? discountedUnitPrice(price, promo) : price;
 
+  const outOfStock = product.trackStock && product.stock <= 0;
+  const lowStock = product.trackStock && !outOfStock && product.stock <= product.lowStockThreshold;
+
   const fastAdd = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (outOfStock) return;
     quickAdd(product);
     setAdded(true);
     setTimeout(() => setAdded(false), 900);
@@ -195,14 +199,21 @@ function ProductCard({
         aria-label={`Tambah ${product.name} ke keranjang`}
         className={cn(
           "absolute right-2 top-2 z-10 flex h-8 w-8 items-center justify-center rounded-full shadow-elevated transition-all duration-150",
-          added
-            ? "bg-success-500 text-white"
-            : "bg-surface text-primary-600 hover:scale-110 hover:bg-primary-500 hover:text-white",
+          outOfStock
+            ? "hidden"
+            : added
+              ? "bg-success-500 text-white"
+              : "bg-surface text-primary-600 hover:scale-110 hover:bg-primary-500 hover:text-white",
         )}
       >
         {added ? <Check size={15} /> : <Plus size={15} />}
       </button>
-      <div className="flex h-24 items-center justify-center bg-primary-50 text-4xl">
+      <div
+        className={cn(
+          "flex h-24 items-center justify-center bg-primary-50 text-4xl",
+          outOfStock && "grayscale opacity-50",
+        )}
+      >
         {product.emoji ?? "🍽️"}
       </div>
       <div className="flex flex-1 flex-col gap-1 p-3">
@@ -223,6 +234,17 @@ function ProductCard({
           )}
         </div>
         <p className="text-[11px] text-text-muted">{orderTypeLabels[orderType]}</p>
+        {product.trackStock ? (
+          <p className="text-[11px] font-medium text-text-muted">
+            {outOfStock ? (
+              <span className="text-error-600">Stok habis</span>
+            ) : lowStock ? (
+              <span className="text-warning-strong">Menipis · sisa {product.stock}</span>
+            ) : (
+              <span>Stok: {product.stock}</span>
+            )}
+          </p>
+        ) : null}
       </div>
     </div>
   );

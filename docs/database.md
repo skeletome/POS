@@ -23,12 +23,14 @@ store_members ──────────►│
    ▼                     ▼
 auth.uid() ──► is_store_member(store_id) ──► RLS gate ──► stores (tenant)
                                                           │
-        ┌───────────┬───────────────┬───────────┬─────────┴──────────┐
-        ▼           ▼               ▼           ▼                    ▼
-    categories   products ─────────► banks   tax settings         (kolom di stores)
-                   │               
-                   ▼               
-             option_groups ──► options
+┌───────────┬───────────────┬───────────┬─────────┴──────────┐
+         ▼           ▼               ▼           ▼                    ▼
+     categories   products ─────────► banks   tax settings         (kolom di stores)
+                    │               
+                    ▼               
+              option_groups ──► options
+
+   products ──► stock_movements (ledger: SALE/RETURN/PURCHASE/ADJUSTMENT/OPNAME)
 
    product_discounts ─► product_discount_items ─► products (many-to-many)
    vouchers (per store, kode unik)
@@ -108,8 +110,30 @@ Semua field untuk snapshot juga disimpan terpisah agar aman dari perubahan.
 | `dine_in_price` | int | rupiah integer |
 | `takeaway_price` | int | rupiah integer |
 | `active` | boolean | |
+| `track_stock` | boolean | default false — FALSE = tidak dihitung stok |
+| `stock` | int | default 0, `CHECK ≥ 0`; berkurang atomik saat transaksi |
+| `low_stock_threshold` | int | default 5 — ambang "menipis" |
 | `created_at` / `updated_at` | | |
 | **CHECK** | | `dine_in_available OR takeaway_available` — minimal satu order type |
+
+### `stock_movements` — ledger stok (immutable)
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | uuid PK | |
+| `store_id` | uuid FK → stores (cascade) | |
+| `product_id` | uuid FK → products (cascade) | |
+| `movement_type` | text `CHECK IN (…)` | `SALE` / `RETURN` / `PURCHASE` / `ADJUSTMENT` / `OPNAME` |
+| `quantity` | int `CHECK ≠ 0` | **bertanda**: SALE = -qty, PURCHASE/RETURN = +qty, ADJUSTMENT/OPNAME = selisih (+/-) |
+| `balance_after` | int | sisa stok sesudah mutasi (≥ 0), disimpan per baris |
+| `transaction_id` | uuid FK → transactions (SET NULL) | terisi utk SALE/RETURN |
+| `created_by` | uuid FK → auth.users (SET NULL) | |
+| `note` | text | catatan (wajib utk ADJUSTMENT/OPNAME) |
+| `created_at` | timestamptz | |
+
+RLS: SELECT = member, INSERT = Owner, **tanpa policy UPDATE/DELETE** (ledger immutable).
+
+Aturan Model 1 (stok per produk jadi): 1 unit stok = 1 porsi/dish yang dijual. Bahan baku/resep (BOM) tidak dilacak (di luar MVP).
 
 ### `option_groups` & `options`
 
@@ -267,8 +291,12 @@ public.discount_type      ('PERCENT', 'FIXED')
 | `get_store_cashiers(store_id)` | SECURITY DEFINER | daftar member store (owner) |
 | `next_transaction_no(store_id)` | SECURITY DEFINER | increment TRX per store |
 | `create_transaction(…)` | SECURITY DEFINER | insert txn + items secara atomik, hitung ulang total di DB |
+| `cancel_transaction(transaction_no, store_id)` | SECURITY DEFINER | Owner: batalkan transaksi + restock RETURN secara atomik & idempotent |
+| `stock_mutation(product_id, store_id, type, …)` | SECURITY DEFINER | Owner: PURCHASE / ADJUST / OPNAME, hitung delta & tulis ledger |
 
 `create_transaction` **selalu menghitung ulang** subtotal/tax/total dari snapshot item + rate di `stores` — nilai dari client tidak dipercaya. Sejak V7 juga memvalidasi & menerapkan diskon produk aktif dan voucher (param `p_voucher_code`), menaikkan `used_count` voucher secara atomik dalam transaksi yang sama.
+
+Sejak V8, `create_transaction` juga memotong stok secara **atomik**: untuk produk dengan `track_stock = true`, baris di-lock (`SELECT … FOR UPDATE`), transaksi **ditolak bila stok tidak mencukupi** (`raise exception`), stok dikurangi, lalu baris `stock_movements` tipe `SALE` dicatat (dengan `balance_after`). `cancel_transaction` membatalkan + mengembalikan stok (tipe `RETURN`) dalam satu transaksi DB dan idempotent (aman dipanggil ulang). `stock_mutation` berlaku untuk mutasi manual di halaman Stok — hanya Owner, `note` wajib untuk penyesuaian/opname.
 
 ---
 
@@ -290,6 +318,8 @@ idx_transaction_items_store     (store_id)
 idx_product_discounts_store     (store_id, active)
 idx_product_discount_items_product (product_id)
 idx_vouchers_store_active       (store_id, active)
+idx_stock_movements_store_product_created (store_id, product_id, created_at desc)
+idx_stock_movements_transaction (transaction_id)
 ```
 
 ---

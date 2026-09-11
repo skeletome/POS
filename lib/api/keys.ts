@@ -18,4 +18,5 @@ export const queryKeys = {
     page: (params: unknown) => ["transactions", "page", params] as const,
   },
   reports: (from?: string, to?: string) => ["reports", { from, to }] as const,
+  stockMovements: (filters?: object) => ["stock", "movements", filters] as const,
 };

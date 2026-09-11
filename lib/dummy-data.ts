@@ -29,6 +29,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 20000,
     takeawayPrice: 22000,
     active: true,
+    trackStock: true,
+    stock: 15,
+    lowStockThreshold: 5,
     optionGroups: [
       {
         id: "og-nasgor-ukuran",
@@ -71,6 +74,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 18000,
     takeawayPrice: 20000,
     active: true,
+    trackStock: true,
+    stock: 3,
+    lowStockThreshold: 5,
     optionGroups: [
       {
         id: "og-mie-level",
@@ -103,6 +109,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 17000,
     takeawayPrice: 19000,
     active: true,
+    trackStock: true,
+    stock: 20,
+    lowStockThreshold: 5,
     optionGroups: [
       {
         id: "og-geprek-level",
@@ -127,6 +136,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 15000,
     takeawayPrice: 17000,
     active: true,
+    trackStock: true,
+    stock: 0,
+    lowStockThreshold: 5,
     optionGroups: [],
   },
   {
@@ -140,6 +152,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 5000,
     takeawayPrice: 6000,
     active: true,
+    trackStock: true,
+    stock: 40,
+    lowStockThreshold: 5,
     optionGroups: [
       {
         id: "og-teh-gula",
@@ -164,6 +179,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 8000,
     takeawayPrice: 9000,
     active: true,
+    trackStock: true,
+    stock: 12,
+    lowStockThreshold: 5,
     optionGroups: [],
   },
   {
@@ -177,6 +195,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 12000,
     takeawayPrice: 13000,
     active: true,
+    trackStock: true,
+    stock: 8,
+    lowStockThreshold: 5,
     optionGroups: [
       {
         id: "og-campur-topping",
@@ -201,6 +222,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 10000,
     takeawayPrice: 11000,
     active: true,
+    trackStock: true,
+    stock: 4,
+    lowStockThreshold: 5,
     optionGroups: [
       {
         id: "og-roti-isi",
@@ -225,6 +249,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 8000,
     takeawayPrice: 10000,
     active: true,
+    trackStock: true,
+    stock: 25,
+    lowStockThreshold: 5,
     optionGroups: [],
   },
   {
@@ -238,6 +265,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 7000,
     takeawayPrice: 8000,
     active: true,
+    trackStock: true,
+    stock: 6,
+    lowStockThreshold: 5,
     optionGroups: [
       {
         id: "og-pisang-top",
@@ -261,6 +291,9 @@ export const initialProducts: Product[] = [
     dineInPrice: 15000,
     takeawayPrice: 16000,
     active: true,
+    trackStock: true,
+    stock: 18,
+    lowStockThreshold: 5,
     optionGroups: [
       {
         id: "og-kopi-es",
