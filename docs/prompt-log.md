@@ -97,4 +97,18 @@ skill `append-notes`.
 **Verifikasi:** build ✓ (`npm run build`, TypeScript clean)
 **Lanjutan:** migration V8 belum diterapkan; belum commit (tunggu instruksi user).
 
+---
+
+## [2026-09-12] — Push stok ke development + merge main
+
+**Prompt:** "push ke dev dan merge main sehingga main mengikuti dev terbaru"
+
+**Yang diubah:**
+- Commit `4deb18f` di branch `development` (25 file, +1938 −91) berisi seluruh fitur stok Model 1 (migration V8, API stok, halaman `/stok`, integrasi POS/menu/dashboard, PRD #23 & docs) + fix tabel riwayat `/stok` (id kolom = accessorKey).
+- `development` di-remote diperbarui (`c248c62..4deb18f`), lalu `main` di-merge fast-forward dari `development` dan di-push (`c248c62..4deb18f`). Kini `origin/development` = `origin/main` = `4deb18f`.
+
+**Verifikasi:** `git push origin development` ✓, `git merge development` (main) fast-forward ✓, `git push origin main` ✓. `git diff origin/development origin/main` kosong, worktree bersih. Tidak ada file `.env*`/secret ter-stage.
+
+**Lanjutan:** migration V8 belum diterapkan ke DB supabase (rencana: SQL Editor Dashboard); selain itu stok sudah live di development & main.
+
 **Lanjutan:** belum commit (tunggu instruksi). Implementasi fitur stok (migration V8, `/api/stock`, halaman `/stok`, badge POS, toggle & filter menu, kartu dashboard, cancel restock) masih antre — migration V8 nanti di-apply manual via SQL Editor seperti V7.
